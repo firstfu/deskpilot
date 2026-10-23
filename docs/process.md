@@ -19,7 +19,7 @@
 
 ## 時間線
 
-### 2026-10-23 — v0 骨架，實機跑通
+### 2026-10-23 — v0 骨架，實機跑通（`bd2a3dd`）
 
 - 用 Xcode MCP 建立專案 `DeskPilot.xcodeproj`：iOS target `DeskPilot`、macOS target `DeskPilotHost`、共用資料夾 `Shared/`（MCP 沒有設定 target membership 的工具，這一步手動改了 pbxproj 加 synchronized group）
 - 模擬器實測：Bonjour 探索、TCP 連線、Hello 交握成功
