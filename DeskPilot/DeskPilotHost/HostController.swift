@@ -153,6 +153,12 @@ final class HostSession: @unchecked Sendable {
     /// 最近一次收到手機滑鼠事件的時間；期間內不回報游標，避免主機回報與手機本地游標互相拉扯。
     private var lastRemoteMouse: TimeInterval = 0
     private let counters = OSAllocatedUnfairLock(initialState: (frames: 0, lastBytes: UInt64(0), encodeTotalMs: 0.0))
+    /// 最近一張擷取到的畫面與時間（host clock 秒），供靜止後的畫質補強使用。
+    private let lastFrame = OSAllocatedUnfairLock<(buffer: CVPixelBuffer, time: Double, refined: Int)?>(initialState: nil)
+    private var refineTimer: DispatchSourceTimer?
+    /// 畫面停止變化多久後開始補強、最多補幾張。
+    private static let refineDelay = 0.12
+    private static let maxRefines = 3
     /// 等待中的延遲探針：(編號, 收到時的 host clock 秒數)。擷取時間晚於此的第一張影格會帶上編號。
     private let pendingProbe = OSAllocatedUnfairLock<(UInt32, Double)?>(initialState: nil)
 
@@ -244,7 +250,10 @@ final class HostSession: @unchecked Sendable {
         let h = Int(nativeH * scale) & ~1
 
         do {
-            let enc = try VideoEncoder(width: w, height: h, bitrate: 6_000_000)
+            // 預設 1 Mbps：搭配靜止畫質補強，捲動流量與 RDP AVC444 相當（≈ 0.96 Mbps），停下後文字清晰度與 6 Mbps 無明顯差異。
+            // DESKPILOT_BITRATE 可覆寫（量測用）
+            let bitrate = Int(ProcessInfo.processInfo.environment["DESKPILOT_BITRATE"] ?? "") ?? 1_000_000
+            let enc = try VideoEncoder(width: w, height: h, bitrate: bitrate)
             enc.onEncoded = { [weak self] frame in self?.send(frame) }
             encoderBox.withLock { $0 = enc }
             capturer.onFrame = { [weak self] pb, pts in self?.captured(pb, pts) }
@@ -255,7 +264,10 @@ final class HostSession: @unchecked Sendable {
                                       videoWidth: UInt16(w), videoHeight: UInt16(h))
             framed.send(.helloAck, ack.encode())
             onStarted?((w, h), enc.codec)
-            queue.async { self.startCursorReporting() }
+            queue.async {
+                self.startCursorReporting()
+                self.startRefining()
+            }
         } catch {
             HostController.log.error("無法開始串流：\(error.localizedDescription, privacy: .public)")
             onError?(error.localizedDescription)
@@ -265,6 +277,8 @@ final class HostSession: @unchecked Sendable {
 
     private func captured(_ pb: CVPixelBuffer, _ pts: CMTime) {
         guard let encoder else { return }
+        // 即使這張因背壓被丟掉，也要記住最新畫面，靜止補強時才會用到正確內容
+        lastFrame.withLock { $0 = (pb, pts.seconds, 0) }
         if framed.currentStats.videoFramesInFlight >= Self.maxFramesInFlight { return }
         // 擷取時間晚於探針抵達的第一張影格，就是反映這次輸入的畫面
         let probeId = pendingProbe.withLock { p -> UInt32 in
@@ -290,6 +304,27 @@ final class HostSession: @unchecked Sendable {
         }
     }
 
+    /// 靜止畫質補強：畫面停止變化 `refineDelay` 秒後，把最後一張再編碼幾次。
+    /// 編碼器拿「原始畫面」和「上一張解碼後的模糊結果」比差異，所以重複送同一張會逐步把細節補回來；
+    /// 這讓移動中可以用低位元率（省流量），停下來後文字又恢復清晰。每次停頓只多花幾十 KB。
+    private func startRefining() {
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now(), repeating: .milliseconds(40))
+        t.setEventHandler { [weak self] in
+            guard let self, let encoder = self.encoder,
+                  self.framed.currentStats.videoFramesInFlight < Self.maxFramesInFlight else { return }
+            let now = CMClockGetTime(CMClockGetHostTimeClock())
+            let buffer = self.lastFrame.withLock { f -> CVPixelBuffer? in
+                guard let cur = f, now.seconds - cur.time > Self.refineDelay, cur.refined < Self.maxRefines else { return nil }
+                f = (cur.buffer, cur.time, cur.refined + 1)
+                return cur.buffer
+            }
+            if let buffer { encoder.encode(buffer, pts: now) }
+        }
+        t.resume()
+        refineTimer = t
+    }
+
     /// 30Hz 檢查實體游標，有變才送（4 bytes + 5 bytes 標頭）。
     private func startCursorReporting() {
         let t = DispatchSource.makeTimerSource(queue: queue)
@@ -309,6 +344,9 @@ final class HostSession: @unchecked Sendable {
     private func teardown() {
         cursorTimer?.cancel()
         cursorTimer = nil
+        refineTimer?.cancel()
+        refineTimer = nil
+        lastFrame.withLock { $0 = nil }
         capturer.stop()
         encoderBox.withLock { $0 = nil }
         onEnded?()

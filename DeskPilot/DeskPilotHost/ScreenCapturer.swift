@@ -39,8 +39,8 @@ final class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         config.showsCursor = false
-        // 佇列太深會增加延遲，太淺編碼器忙時會掉幀；3 是 Apple 建議的低延遲下限
-        config.queueDepth = 3
+        // 佇列太深會增加延遲，太淺編碼器忙時會掉幀；靜止補強會長期持有一張，所以比最低值 3 多留一格
+        config.queueDepth = 4
 
         // 測試用：環境變數 DESKPILOT_EXCLUDE_BUNDLES（逗號分隔 bundle id）指定的 App 不擷取。
         // 用模擬器當用戶端時必須排除模擬器，否則它顯示串流畫面 → 被擷取 → 再串流，形成無限迴圈，量不到真實數字

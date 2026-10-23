@@ -38,7 +38,7 @@
   - 捲動（720 px/s）：平均 3.4 Mbps（0.43 MB/s），56 fps
   - 「靜止」≈ 220 kbps、約 50 fps：Mac 上有東西一直在動（推測是終端機 spinner），不是真正靜止，閒置 0 流量尚未在乾淨桌面上驗證
 
-### 2026-10-23 — 編碼器 A/B 與官方數據對照（尚未 commit）
+### 2026-10-23 — 編碼器 A/B 與官方數據對照（`ac01a47`）
 
 - `scripts/host-bench.sh start [hevc|h264]`／`report`：重開主機（排除 Device Hub）並收量測結果；`DESKPILOT_CODEC` 切 codec
 - 實際編碼解析度 1920×1080（模擬器螢幕像素再被桌面大小限制）
@@ -49,11 +49,22 @@
   - 延遲差在單次量測誤差內，流量 HEVC 明顯省 → 維持 HEVC 預設
 - 官方數據對照（1080p）：微軟 RDP 網頁瀏覽 default 6～6.5 Mbps、AVC444 0.9～1 Mbps，idle 0.3 kbps；Parsec 預設位元率上限 10 Mbps；Jump Fluid 上限 20～30 Mbps。**捲動流量我們（3.4 Mbps）比 RDP AVC444 高約 3 倍，是要追的目標**
 
+### 2026-10-24 — 位元率降到 1 Mbps＋靜止畫質補強（尚未 commit）
+
+- 靜止畫質補強：畫面停 120 ms 後把最後一張重編 3 次（編碼器比對原圖與上一張解碼結果，重複送會補回細節）；擷取 queueDepth 3→4（補強會長期持有一張 buffer）
+- 位元率掃描（模擬器、HEVC、1080p、捲動 720 px/s）：
+  - 6 Mbps：捲動 3.58 Mbps，延遲中位 23.7 ms
+  - 2 Mbps：捲動 1.82 Mbps，延遲中位 21.9 ms
+  - 1 Mbps：捲動 **0.96 Mbps**，延遲中位 25.1 ms（與 RDP AVC444 的 0.9～1 Mbps 相當）
+- 停下後截圖比對 6 vs 1 Mbps 文字無明顯差異（截圖僅 402pt 寬，細節有限；捲動「進行中」的畫質未驗證）→ 預設改 1 Mbps
+- 已知取捨：影片／大面積動畫在 1 Mbps 會較糊，之後依內容自動調整位元率
+
 ## 下一步
 
-1. 降捲動流量（目標 ≤ 1 Mbps）：調低位元率／品質上限、捲動搬移（只補新露出區域）；在乾淨桌面驗證閒置 0 流量
-2. 量測：觸控→畫面的端到端延遲（慢動作錄影），與競品同法比較
-2. 手感調校（游標靈敏度、捲動倍率）依實機回饋
-3. v0.2：底圖＋可視範圍兩層編碼、配對加密（目前區網明文、無驗證，僅限自家網路）
-4. 遷移到 iOS 27 新的 `AVSampleBufferVideoRenderer.Receiver` API（舊 enqueue/flush 已 deprecated，仍可用）
-5. 正式 benchmark：對比 RDP、Parsec、Jump Desktop、RustDesk
+1. iPhone 實機確認 1 Mbps 捲動中文字可讀性與停下後清晰度
+2. 依內容自動調位元率（文字捲動低、影片高）；捲動搬移（只補新露出區域）
+3. 在乾淨桌面驗證閒置 0 流量
+4. 量測：觸控→畫面的端到端延遲（慢動作錄影），與競品同法比較
+5. 手感調校（游標靈敏度、捲動倍率）依實機回饋
+6. v0.2：底圖＋可視範圍兩層編碼、配對加密（目前區網明文、無驗證，僅限自家網路）
+7. 遷移到 iOS 27 新的 `AVSampleBufferVideoRenderer.Receiver` API（舊 enqueue/flush 已 deprecated，仍可用）
