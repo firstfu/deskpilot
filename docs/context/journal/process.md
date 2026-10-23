@@ -4,7 +4,7 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
-### 2026-10-24 — 公開到 GitHub、建立 docs/context 文件體系；手機尺寸虛擬螢幕試做後全數撤回（尚未 commit）
+### 2026-10-24 — 公開到 GitHub、建立 docs/context 文件體系；手機尺寸虛擬螢幕試做後全數撤回（`940e8ab`）
 
 - **變更**：
   - repo 推上 GitHub 公開：https://github.com/firstfu/deskpilot（`main`）
@@ -12,7 +12,7 @@
   - 試做「手機尺寸虛擬螢幕」（CGVirtualDisplay 私有 API）→ 使用者要求整個刪除，程式回到 `f13d22f`，實驗檔一併刪除，淨程式變更為 0
 - **為什麼**：程式只存本機有遺失風險；讓下個 session 開場有固定入口；虛擬螢幕 Retina 被系統拒絕、Swift 建立的不上線，價值不足以承擔私有 API 風險（細節見 `reference/overview.md`「已評估並否決的方向」）
 - **影響檔案**：`CLAUDE.md`、`docs/context/**`、刪除 `docs/process.md`
-- **下一步**：commit 本次文件變更並 push；之後照下方「下一步」清單
+- **下一步**：照下方「下一步」清單
 
 <!-- 以下 2026-10-23～24 的紀錄原寫在 docs/process.md，2026-10-24 建立 docs/context/ 時原文搬入，僅改為最新在上 -->
 
