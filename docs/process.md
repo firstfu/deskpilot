@@ -26,6 +26,18 @@
 - 踩雷：主機缺「螢幕與系統錄音」權限時 ScreenCaptureKit 回 `使用者拒絕…擷取的TCC`；加了啟動時 `CGPreflightScreenCaptureAccess`／`CGRequestScreenCaptureAccess`，使用者在系統設定開啟後預檢為 true
 - iPhone 15 實機端到端跑通，使用者回饋「速度很快」（尚未正式量測延遲）
 
+### 2026-10-23 — 內建量測（模擬器，尚未 commit）
+
+- 協定 v2：新增延遲探針（probe）與量測回報（report）；影格帶 probeId。手機按 ⏲ 自動跑「靜止 → 40 個探針 → 8 秒捲動」，結果回寫主機 log
+- 主機每秒 log `stats fps/kbps/encodeMs/ax/scrolls`；環境變數 `DESKPILOT_EXCLUDE_BUNDLES` 可排除指定 App 不擷取
+- 踩雷：模擬器視窗屬於 Xcode 的 **Device Hub（`com.apple.dt.Devices`）**，不是 Simulator；不排除它會形成「擷取自己的串流」無限迴圈
+- 踩雷：游標停在網頁內嵌媒體區時捲動事件被吃掉，畫面不動；移到正文才正常
+- 模擬器結果（loopback，RTT 0.7 ms，不含 Wi-Fi、不含手機解碼上屏）：
+  - 延遲：中位 21～24 ms、P90 ≈ 47 ms、最佳 12 ms
+  - 編碼耗時 ≈ 10 ms／幀，是延遲最大單一來源
+  - 捲動（720 px/s）：平均 3.4 Mbps（0.43 MB/s），56 fps
+  - 「靜止」≈ 220 kbps、約 50 fps：Mac 上有東西一直在動（推測是終端機 spinner），不是真正靜止，閒置 0 流量尚未在乾淨桌面上驗證
+
 ## 下一步
 
 1. 量測：觸控→畫面的端到端延遲、靜止／捲動／拖視窗三情境的流量，對比 Parsec、Jump Desktop、RDP

@@ -32,6 +32,10 @@ final class HostController {
     private(set) var codecName = ""
     /// 最近一次串流失敗的原因，顯示在視窗上。
     private(set) var lastError: String?
+    /// 延遲探針標記：每收到一個探針就改變，讓主機視窗重繪、產生一張新影格。
+    private(set) var probeMarker: UInt32 = 0
+    /// 編碼耗時（毫秒，近一秒平均）。
+    private(set) var encodeMs = 0.0
 
     private var listener: NWListener?
     private var session: HostSession?
@@ -103,6 +107,9 @@ final class HostController {
         s.onError = { [weak self] msg in
             Task { @MainActor in self?.lastError = msg }
         }
+        s.onProbe = { [weak self] id in
+            Task { @MainActor in self?.probeMarker = id }
+        }
         session = s
         lastError = nil
         status = .connected(name)
@@ -119,6 +126,8 @@ final class HostController {
         fps = snap.frames
         kbps = Double(snap.bytes) * 8 / 1000
         totalMB = Double(snap.totalBytes) / 1_000_000
+        encodeMs = snap.encodeMs
+        Self.log.notice("stats fps=\(snap.frames, privacy: .public) kbps=\(Int(self.kbps), privacy: .public) encodeMs=\(String(format: "%.1f", snap.encodeMs), privacy: .public) ax=\(self.accessibilityGranted, privacy: .public) scrolls=\(snap.scrolls, privacy: .public)")
     }
 }
 
@@ -128,6 +137,8 @@ final class HostSession: @unchecked Sendable {
         var frames = 0
         var bytes: UInt64 = 0
         var totalBytes: UInt64 = 0
+        var encodeMs = 0.0
+        var scrolls = 0
     }
 
     private let queue = DispatchQueue(label: "deskpilot.session", qos: .userInteractive)
@@ -141,12 +152,16 @@ final class HostSession: @unchecked Sendable {
     private var lastCursor: (UInt16, UInt16)?
     /// 最近一次收到手機滑鼠事件的時間；期間內不回報游標，避免主機回報與手機本地游標互相拉扯。
     private var lastRemoteMouse: TimeInterval = 0
-    private let counters = OSAllocatedUnfairLock(initialState: (frames: 0, lastBytes: UInt64(0)))
+    private let counters = OSAllocatedUnfairLock(initialState: (frames: 0, lastBytes: UInt64(0), encodeTotalMs: 0.0))
+    /// 等待中的延遲探針：(編號, 收到時的 host clock 秒數)。擷取時間晚於此的第一張影格會帶上編號。
+    private let pendingProbe = OSAllocatedUnfairLock<(UInt32, Double)?>(initialState: nil)
 
     var onEnded: (() -> Void)?
     var onStarted: (((Int, Int), VideoCodec) -> Void)?
     /// 無法開始串流時呼叫（例如缺螢幕錄製權限）。
     var onError: ((String) -> Void)?
+    /// 收到延遲探針時呼叫，主機視窗據此重繪。
+    var onProbe: ((UInt32) -> Void)?
 
     /// 允許同時「在路上」的影格數。超過就丟掉新影格，延遲才不會越積越多。
     private static let maxFramesInFlight = 2
@@ -174,9 +189,12 @@ final class HostSession: @unchecked Sendable {
     func takeSecondStats() -> SecondStats {
         let total = framed.currentStats.bytesSent
         return counters.withLock { c in
-            let s = SecondStats(frames: c.frames, bytes: total - c.lastBytes, totalBytes: total)
+            let avg = c.frames > 0 ? c.encodeTotalMs / Double(c.frames) : 0
+            let s = SecondStats(frames: c.frames, bytes: total - c.lastBytes, totalBytes: total, encodeMs: avg,
+                                scrolls: injector.scrollCount)
             c.frames = 0
             c.lastBytes = total
+            c.encodeTotalMs = 0
             return s
         }
     }
@@ -200,6 +218,14 @@ final class HostSession: @unchecked Sendable {
             framed.send(.pong, payload)
         case .requestKeyframe:
             encoder?.requestKeyframe()
+        case .probe:
+            var r = ByteReader(payload)
+            guard let id = try? r.u32() else { return }
+            pendingProbe.withLock { $0 = (id, CMClockGetTime(CMClockGetHostTimeClock()).seconds) }
+            onProbe?(id)
+        case .report:
+            let text = String(data: payload, encoding: .utf8) ?? ""
+            HostController.log.notice("量測回報：\(text, privacy: .public)")
         default:
             break
         }
@@ -240,7 +266,13 @@ final class HostSession: @unchecked Sendable {
     private func captured(_ pb: CVPixelBuffer, _ pts: CMTime) {
         guard let encoder else { return }
         if framed.currentStats.videoFramesInFlight >= Self.maxFramesInFlight { return }
-        encoder.encode(pb, pts: pts)
+        // 擷取時間晚於探針抵達的第一張影格，就是反映這次輸入的畫面
+        let probeId = pendingProbe.withLock { p -> UInt32 in
+            guard let (id, armed) = p, pts.seconds > armed else { return 0 }
+            p = nil
+            return id
+        }
+        encoder.encode(pb, pts: pts, probeId: probeId)
     }
 
     private func send(_ frame: VideoEncoder.EncodedFrame) {
@@ -249,9 +281,13 @@ final class HostSession: @unchecked Sendable {
         }
         let msg = VideoFrameMessage(isKeyframe: frame.isKeyframe,
                                     captureTimeNs: DispatchTime.now().uptimeNanoseconds,
+                                    probeId: frame.probeId,
                                     payload: frame.data)
         framed.sendVideo(.videoFrame, msg.encode())
-        counters.withLock { $0.frames += 1 }
+        counters.withLock {
+            $0.frames += 1
+            $0.encodeTotalMs += frame.encodeMs
+        }
     }
 
     /// 30Hz 檢查實體游標，有變才送（4 bytes + 5 bytes 標頭）。

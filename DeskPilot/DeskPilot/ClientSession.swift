@@ -43,9 +43,15 @@ final class ClientSession {
     private(set) var kbps = 0.0
     private(set) var rttMs: Double?
     private(set) var totalMB = 0.0
+    /// 量測進行中的狀態文字；nil 表示沒有在量。
+    var benchmarkStatus: String?
+    /// 最近一次量測結果。
+    var benchmarkResult: String?
+    /// 延遲探針結果（毫秒），量測期間累積。
+    var probeSamples: [Double] = []
 
     private var browser: NWBrowser?
-    private var link: ClientLink?
+    private(set) var link: ClientLink?
     private var statsTimer: Timer?
     private var renderer: AVSampleBufferVideoRenderer?
 
@@ -93,6 +99,9 @@ final class ClientSession {
         }
         l.onPong = { [weak self] rtt in
             Task { @MainActor in self?.rttMs = rtt }
+        }
+        l.onProbeResult = { [weak self] ms in
+            Task { @MainActor in self?.probeSamples.append(ms) }
         }
         l.onEnded = { [weak self, weak l] in
             Task { @MainActor in
@@ -187,6 +196,10 @@ final class ClientLink: @unchecked Sendable {
     var onHelloAck: ((HelloAckMessage) -> Void)?
     var onCursor: ((CursorMessage) -> Void)?
     var onPong: ((Double) -> Void)?
+    /// 收到帶探針編號的影格時呼叫，參數為探針來回毫秒數。
+    var onProbeResult: ((Double) -> Void)?
+    /// 已送出、尚未收到回應的探針送出時間（奈秒）。只在 `queue` 上存取。
+    private var probeSentAt: [UInt32: UInt64] = [:]
     var onEnded: (() -> Void)?
 
     init(endpoint: NWEndpoint) {
@@ -212,6 +225,16 @@ final class ClientLink: @unchecked Sendable {
 
     func send(_ type: MessageType, _ payload: Data) {
         framed.send(type, payload)
+    }
+
+    /// 送出延遲探針並記錄送出時間。
+    func sendProbe(_ id: UInt32) {
+        queue.async {
+            self.probeSentAt[id] = DispatchTime.now().uptimeNanoseconds
+            var w = ByteWriter()
+            w.u32(id)
+            self.framed.send(.probe, w.data)
+        }
     }
 
     /// 顯示層換新（或第一次掛上）時，從下一張關鍵幀重新開始解碼。
@@ -246,6 +269,9 @@ final class ClientLink: @unchecked Sendable {
             if let f = try? VideoFormatMessage.decode(payload) { formatDescription = Self.makeFormat(f) }
         case .videoFrame:
             guard let frame = try? VideoFrameMessage.decode(payload) else { return }
+            if frame.probeId != 0, let sent = probeSentAt.removeValue(forKey: frame.probeId) {
+                onProbeResult?(Double(DispatchTime.now().uptimeNanoseconds - sent) / 1_000_000)
+            }
             render(frame)
         case .cursor:
             if let c = try? CursorMessage.decode(payload) { onCursor?(c) }

@@ -44,8 +44,19 @@ struct ContentView: View {
                     GridRow { Text("流量"); Text(String(format: "%.0f kbps", controller.kbps)).monospacedDigit() }
                     GridRow { Text("累計"); Text(String(format: "%.2f MB", controller.totalMB)).monospacedDigit() }
                     GridRow { Text("編碼"); Text(controller.codecName.isEmpty ? "—" : "\(controller.codecName) \(controller.videoSize)") }
+                    GridRow { Text("編碼耗時"); Text(String(format: "%.1f ms", controller.encodeMs)).monospacedDigit() }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // 延遲探針標記：手機量延遲時每個探針換一次顏色，製造畫面變化。量測時本視窗需在螢幕上可見
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(controller.probeMarker % 2 == 0 ? Color.blue : Color.orange)
+                    .frame(width: 28, height: 28)
+                Text("延遲探針 #\(controller.probeMarker)")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
 
             Text("畫面靜止時不傳任何影像資料，流量會降到 0。")

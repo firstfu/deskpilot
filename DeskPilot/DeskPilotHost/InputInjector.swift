@@ -18,6 +18,8 @@ final class InputInjector: @unchecked Sendable {
     private var lastClickTime: TimeInterval = 0
     private var lastClickPosition = CGPoint.zero
     private var clickCount = 0
+    /// 累計注入的捲動事件數（除錯／量測用）。
+    private(set) var scrollCount = 0
 
     /// 是否已取得輔助使用權限。
     /// - Parameter prompt: true 時若未授權會跳出系統設定提示。
@@ -49,8 +51,12 @@ final class InputInjector: @unchecked Sendable {
             postButton(button, down: down)
         case let .scroll(dx, dy):
             // 協定定義正值 = 內容往下／右移，與 CGEvent wheel 正值（往上捲、內容下移）同向
-            CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
-                    wheel1: Int32(dy), wheel2: Int32(dx), wheel3: 0)?.post(tap: .cghidEventTap)
+            let e = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
+                            wheel1: Int32(dy), wheel2: Int32(dx), wheel3: 0)
+            // 明確指定位置：捲動事件送到「游標底下」的視窗，未設定時部分 App 會忽略
+            if let loc = CGEvent(source: nil)?.location { e?.location = loc }
+            e?.post(tap: .cghidEventTap)
+            scrollCount += 1
         case let .key(code, down, mods):
             let e = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down)
             e?.flags = Self.flags(mods)

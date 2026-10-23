@@ -85,6 +85,9 @@ struct RemoteScreen: View {
                     toolButton("escape", active: false) { session.tapKey(MacKeyCode.escape) }
                     toolButton("arrow.right.to.line", active: false) { session.tapKey(MacKeyCode.tab) }
                     toolButton("chart.bar", active: showStats) { showStats.toggle() }
+                    toolButton("speedometer", active: session.benchmarkStatus != nil) {
+                        Task { await session.runBenchmark() }
+                    }
                     toolButton("xmark", active: false) { session.disconnect() }
                 }
                 if showStats {
@@ -94,6 +97,12 @@ struct RemoteScreen: View {
                         .padding(.vertical, 4)
                         .background(.black.opacity(0.55), in: Capsule())
                         .foregroundStyle(.white)
+                }
+                if let status = session.benchmarkStatus {
+                    panel(status)
+                } else if let result = session.benchmarkResult {
+                    panel(result)
+                        .onTapGesture { session.benchmarkResult = nil }
                 }
             }
             .padding(10)
@@ -107,6 +116,16 @@ struct RemoteScreen: View {
         let rate = session.kbps >= 1000 ? String(format: "%.1f Mbps", session.kbps / 1000)
                                         : String(format: "%.0f kbps", session.kbps)
         return "\(session.fps) fps · \(rate) · RTT \(rtt) · \(String(format: "%.1f MB", session.totalMB))"
+    }
+
+    /// 量測進度／結果面板（點一下結果可關閉）。
+    private func panel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption.monospacedDigit())
+            .multilineTextAlignment(.leading)
+            .padding(10)
+            .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 10))
+            .foregroundStyle(.white)
     }
 
     private func toolButton(_ icon: String, active: Bool, action: @escaping () -> Void) -> some View {

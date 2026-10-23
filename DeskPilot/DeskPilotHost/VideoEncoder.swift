@@ -19,6 +19,10 @@ final class VideoEncoder: @unchecked Sendable {
         var data: Data
         /// 只在關鍵幀時帶，供用戶端（重新）建立解碼器。
         var format: VideoFormatMessage?
+        /// 延遲探針編號（0 = 無）。
+        var probeId: UInt32 = 0
+        /// 送進編碼器到編好的耗時（毫秒）。
+        var encodeMs = 0.0
     }
 
     let codec: VideoCodec
@@ -86,7 +90,9 @@ final class VideoEncoder: @unchecked Sendable {
     }
 
     /// 送一張畫面進編碼器；結果非同步回到 `onEncoded`。
-    func encode(_ pixelBuffer: CVPixelBuffer, pts: CMTime) {
+    /// - Parameter probeId: 延遲探針編號，原樣帶到輸出影格（0 = 無）
+    func encode(_ pixelBuffer: CVPixelBuffer, pts: CMTime, probeId: UInt32 = 0) {
+        let start = DispatchTime.now().uptimeNanoseconds
         let force = forceKeyframe.withLock { v -> Bool in
             defer { v = false }
             return v
@@ -96,11 +102,12 @@ final class VideoEncoder: @unchecked Sendable {
                                         duration: .invalid, frameProperties: props, infoFlagsOut: nil) {
             [weak self] status, _, sampleBuffer in
             guard status == noErr, let sampleBuffer, let self else { return }
-            self.handle(sampleBuffer)
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            self.handle(sampleBuffer, probeId: probeId, encodeMs: ms)
         }
     }
 
-    private func handle(_ sb: CMSampleBuffer) {
+    private func handle(_ sb: CMSampleBuffer, probeId: UInt32, encodeMs: Double) {
         guard let block = sb.dataBuffer, let data = try? block.dataBytes() else { return }
         let attachments = CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[CFString: Any]]
         let notSync = attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool ?? false
@@ -109,7 +116,7 @@ final class VideoEncoder: @unchecked Sendable {
         if isKey, let desc = sb.formatDescription {
             format = VideoFormatMessage(codec: codec, parameterSets: Self.parameterSets(desc, codec: codec))
         }
-        onEncoded?(EncodedFrame(isKeyframe: isKey, data: data, format: format))
+        onEncoded?(EncodedFrame(isKeyframe: isKey, data: data, format: format, probeId: probeId, encodeMs: encodeMs))
     }
 
     /// 從格式描述取出參數集（H.264: SPS/PPS；HEVC: VPS/SPS/PPS）。

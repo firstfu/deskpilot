@@ -42,7 +42,12 @@ final class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         // 佇列太深會增加延遲，太淺編碼器忙時會掉幀；3 是 Apple 建議的低延遲下限
         config.queueDepth = 3
 
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        // 測試用：環境變數 DESKPILOT_EXCLUDE_BUNDLES（逗號分隔 bundle id）指定的 App 不擷取。
+        // 用模擬器當用戶端時必須排除模擬器，否則它顯示串流畫面 → 被擷取 → 再串流，形成無限迴圈，量不到真實數字
+        let excludedIDs = Set((ProcessInfo.processInfo.environment["DESKPILOT_EXCLUDE_BUNDLES"] ?? "")
+            .split(separator: ",").map(String.init))
+        let excludedApps = content.applications.filter { excludedIDs.contains($0.bundleIdentifier) }
+        let filter = SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         try await stream.startCapture()

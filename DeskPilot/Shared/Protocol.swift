@@ -13,7 +13,7 @@ import Foundation
 /// 協定層常數。
 enum ProtocolConstants {
     /// 協定版本；不相容的改動要遞增，主機收到不同版本會拒絕連線。
-    static let version: UInt16 = 1
+    static let version: UInt16 = 2
     /// Bonjour 服務類型，需與 iOS Info.plist 的 NSBonjourServices 一致。
     static let bonjourType = "_deskpilot._tcp"
     /// 傳輸框標頭長度（type 1 byte + length 4 bytes）。
@@ -28,6 +28,10 @@ enum MessageType: UInt8 {
     case input = 0x02
     case ping = 0x03
     case requestKeyframe = 0x04
+    /// 延遲探針：payload 為 UInt32 探針編號。主機收到後讓畫面變化，並把下一張影格標上此編號。
+    case probe = 0x05
+    /// 量測結果回報（UTF-8 文字），主機寫進 log 方便收集。
+    case report = 0x06
 
     case helloAck = 0x81
     case videoFormat = 0x82
@@ -189,12 +193,15 @@ struct VideoFrameMessage {
     var isKeyframe: Bool
     /// 主機擷取時間（mach 時間換算的奈秒），供統計用。
     var captureTimeNs: UInt64
+    /// 這張影格回應的延遲探針編號；0 表示不是探針影格。
+    var probeId: UInt32 = 0
     var payload: Data
 
     func encode() -> Data {
         var w = ByteWriter()
         w.u8(isKeyframe ? 1 : 0)
         w.u64(captureTimeNs)
+        w.u32(probeId)
         w.bytes(payload)
         return w.data
     }
@@ -203,7 +210,8 @@ struct VideoFrameMessage {
         var r = ByteReader(d)
         let key = try r.u8() == 1
         let t = try r.u64()
-        return VideoFrameMessage(isKeyframe: key, captureTimeNs: t, payload: r.rest())
+        let probe = try r.u32()
+        return VideoFrameMessage(isKeyframe: key, captureTimeNs: t, probeId: probe, payload: r.rest())
     }
 }
 
