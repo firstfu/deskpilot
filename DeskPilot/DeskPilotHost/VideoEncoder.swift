@@ -40,11 +40,15 @@ final class VideoEncoder: @unchecked Sendable {
     ///   - bitrate: 平均位元率（bps），只在畫面變動時才會用到
     /// - Throws: 所有組合都建立失敗時拋出 `NSError`（OSStatus）。
     init(width: Int, height: Int, bitrate: Int) throws {
-        let attempts: [(CMVideoCodecType, VideoCodec, Bool)] = [
+        var attempts: [(CMVideoCodecType, VideoCodec, Bool)] = [
             (kCMVideoCodecType_HEVC, .hevc, true),
             (kCMVideoCodecType_H264, .h264, true),
             (kCMVideoCodecType_HEVC, .hevc, false),
         ]
+        // 量測用：DESKPILOT_CODEC=h264 時優先試 H.264，方便 A/B 比較編碼延遲
+        if ProcessInfo.processInfo.environment["DESKPILOT_CODEC"] == "h264" {
+            attempts.swapAt(0, 1)
+        }
         var lastStatus: OSStatus = noErr
         for (cmCodec, codec, lowLatency) in attempts {
             var spec: [CFString: Any] = [kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: true]
@@ -58,6 +62,7 @@ final class VideoEncoder: @unchecked Sendable {
                 self.session = out
                 self.codec = codec
                 Self.configure(out, codec: codec, bitrate: bitrate)
+                HostController.log.notice("編碼器：\(codec == .hevc ? "HEVC" : "H.264", privacy: .public) 低延遲=\(lowLatency, privacy: .public) \(width, privacy: .public)×\(height, privacy: .public)")
                 return
             }
         }
@@ -70,8 +75,13 @@ final class VideoEncoder: @unchecked Sendable {
 
     private static func configure(_ s: VTCompressionSession, codec: VideoCodec, bitrate: Int) {
         func set(_ key: CFString, _ value: Any) {
-            VTSessionSetProperty(s, key: key, value: value as CFTypeRef)
+            let status = VTSessionSetProperty(s, key: key, value: value as CFTypeRef)
+            if status != noErr {
+                HostController.log.notice("編碼器不支援 \(key as String, privacy: .public)（\(status, privacy: .public)）")
+            }
         }
+        // 編碼器內部最多只能壓 0 幀：送進一幀就立刻吐出一幀，不為了品質先攢幾幀
+        set(kVTCompressionPropertyKey_MaxFrameDelayCount, 0)
         set(kVTCompressionPropertyKey_RealTime, true)
         set(kVTCompressionPropertyKey_AllowFrameReordering, false)
         set(kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality, true)

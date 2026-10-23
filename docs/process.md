@@ -26,7 +26,7 @@
 - 踩雷：主機缺「螢幕與系統錄音」權限時 ScreenCaptureKit 回 `使用者拒絕…擷取的TCC`；加了啟動時 `CGPreflightScreenCaptureAccess`／`CGRequestScreenCaptureAccess`，使用者在系統設定開啟後預檢為 true
 - iPhone 15 實機端到端跑通，使用者回饋「速度很快」（尚未正式量測延遲）
 
-### 2026-10-23 — 內建量測（模擬器，尚未 commit）
+### 2026-10-23 — 內建量測（模擬器，`4648162`）
 
 - 協定 v2：新增延遲探針（probe）與量測回報（report）；影格帶 probeId。手機按 ⏲ 自動跑「靜止 → 40 個探針 → 8 秒捲動」，結果回寫主機 log
 - 主機每秒 log `stats fps/kbps/encodeMs/ax/scrolls`；環境變數 `DESKPILOT_EXCLUDE_BUNDLES` 可排除指定 App 不擷取
@@ -38,9 +38,21 @@
   - 捲動（720 px/s）：平均 3.4 Mbps（0.43 MB/s），56 fps
   - 「靜止」≈ 220 kbps、約 50 fps：Mac 上有東西一直在動（推測是終端機 spinner），不是真正靜止，閒置 0 流量尚未在乾淨桌面上驗證
 
+### 2026-10-23 — 編碼器 A/B 與官方數據對照（尚未 commit）
+
+- `scripts/host-bench.sh start [hevc|h264]`／`report`：重開主機（排除 Device Hub）並收量測結果；`DESKPILOT_CODEC` 切 codec
+- 實際編碼解析度 1920×1080（模擬器螢幕像素再被桌面大小限制）
+- 低延遲模式下 `MaxFrameDelayCount`、`PrioritizeEncodingSpeedOverQuality` 都回 -12900（不支援，低延遲模式本來就零延遲出幀）
+- 模擬器各跑一次：
+  - HEVC：延遲中位 23.0 ms／P90 32.0 ms，編碼 ≈ 9.7 ms，捲動 3.43 Mbps
+  - H.264：延遲中位 19.9 ms／P90 28.4 ms，編碼 ≈ 9.3 ms，捲動 4.17 Mbps（+22%）
+  - 延遲差在單次量測誤差內，流量 HEVC 明顯省 → 維持 HEVC 預設
+- 官方數據對照（1080p）：微軟 RDP 網頁瀏覽 default 6～6.5 Mbps、AVC444 0.9～1 Mbps，idle 0.3 kbps；Parsec 預設位元率上限 10 Mbps；Jump Fluid 上限 20～30 Mbps。**捲動流量我們（3.4 Mbps）比 RDP AVC444 高約 3 倍，是要追的目標**
+
 ## 下一步
 
-1. 量測：觸控→畫面的端到端延遲、靜止／捲動／拖視窗三情境的流量，對比 Parsec、Jump Desktop、RDP
+1. 降捲動流量（目標 ≤ 1 Mbps）：調低位元率／品質上限、捲動搬移（只補新露出區域）；在乾淨桌面驗證閒置 0 流量
+2. 量測：觸控→畫面的端到端延遲（慢動作錄影），與競品同法比較
 2. 手感調校（游標靈敏度、捲動倍率）依實機回饋
 3. v0.2：底圖＋可視範圍兩層編碼、配對加密（目前區網明文、無驗證，僅限自家網路）
 4. 遷移到 iOS 27 新的 `AVSampleBufferVideoRenderer.Receiver` API（舊 enqueue/flush 已 deprecated，仍可用）
