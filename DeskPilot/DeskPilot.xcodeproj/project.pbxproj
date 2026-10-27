@@ -1,0 +1,973 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4B7BBE5EED5746EB6EB74A3E /* tw.firstfu.DeskPilotHost.helper.plist in Embed launchd plist */ = {isa = PBXBuildFile; fileRef = CEB5611C4AC38894DE3B3447 /* tw.firstfu.DeskPilotHost.helper.plist */; };
+		5C086DF8ADEA22FCAD41ED88 /* DeskPilotHelper in Embed DeskPilotHelper */ = {isa = PBXBuildFile; fileRef = F72188C8C37BB73DB022B6EB /* DeskPilotHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		E49A54CD01D52E4A68E7448C /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0766B96D7C55830181D2CA8C /* Cocoa.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4F0482767B312EE266112629 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 77F0BFF0308BB00100A81371 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1357E7C33133E199D8B7BFEF;
+			remoteInfo = DeskPilotHelper;
+		};
+		77F0C006308BB00200A81371 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 77F0BFF0308BB00100A81371 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 77F0BFF7308BB00100A81371;
+			remoteInfo = DeskPilot;
+		};
+		77F0C010308BB00200A81371 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 77F0BFF0308BB00100A81371 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 77F0BFF7308BB00100A81371;
+			remoteInfo = DeskPilot;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5B079CDE77C0E867B4B7A016 /* Embed launchd plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				4B7BBE5EED5746EB6EB74A3E /* tw.firstfu.DeskPilotHost.helper.plist in Embed launchd plist */,
+			);
+			name = "Embed launchd plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FAF1A78A0FE3EAA354D41EF6 /* Embed DeskPilotHelper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				5C086DF8ADEA22FCAD41ED88 /* DeskPilotHelper in Embed DeskPilotHelper */,
+			);
+			name = "Embed DeskPilotHelper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0766B96D7C55830181D2CA8C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		77F0BFF8308BB00100A81371 /* DeskPilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeskPilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		77F0C005308BB00200A81371 /* DeskPilotTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeskPilotTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		77F0C00F308BB00200A81371 /* DeskPilotUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeskPilotUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		77F0C024308BB00800A81371 /* DeskPilotHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeskPilotHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CEB5611C4AC38894DE3B3447 /* tw.firstfu.DeskPilotHost.helper.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = tw.firstfu.DeskPilotHost.helper.plist; path = HelperSupport/tw.firstfu.DeskPilotHost.helper.plist; sourceTree = "<group>"; };
+		F72188C8C37BB73DB022B6EB /* DeskPilotHelper */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = text; path = DeskPilotHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		77F0C030308BB01E00A81371 /* Exceptions for "DeskPilot" folder in "DeskPilot" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 77F0BFF7308BB00100A81371 /* DeskPilot */;
+		};
+		77F0C056308BB26900A81371 /* Exceptions for "DeskPilotHost" folder in "DeskPilotHost" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 77F0C023308BB00800A81371 /* DeskPilotHost */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		77F0BFFA308BB00100A81371 /* DeskPilot */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				77F0C030308BB01E00A81371 /* Exceptions for "DeskPilot" folder in "DeskPilot" target */,
+			);
+			path = DeskPilot;
+			sourceTree = "<group>";
+		};
+		77F0C008308BB00200A81371 /* DeskPilotTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DeskPilotTests;
+			sourceTree = "<group>";
+		};
+		77F0C012308BB00200A81371 /* DeskPilotUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DeskPilotUITests;
+			sourceTree = "<group>";
+		};
+		77F0C025308BB00800A81371 /* DeskPilotHost */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				77F0C056308BB26900A81371 /* Exceptions for "DeskPilotHost" folder in "DeskPilotHost" target */,
+			);
+			path = DeskPilotHost;
+			sourceTree = "<group>";
+		};
+		77F0C0A0308BB10000A81371 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		7B679C23DA7165FC9B6B5929 /* DeskPilotHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DeskPilotHelper;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		41598639E8F3A1AC6A39352F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E49A54CD01D52E4A68E7448C /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0BFF5308BB00100A81371 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C002308BB00200A81371 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C00C308BB00200A81371 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C021308BB00800A81371 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3F2EDD587548AE9F26A280BF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				6B67ABB8D246D2B72C7ACC61 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		6B67ABB8D246D2B72C7ACC61 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				0766B96D7C55830181D2CA8C /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		77F0BFEF308BB00100A81371 = {
+			isa = PBXGroup;
+			children = (
+				77F0BFFA308BB00100A81371 /* DeskPilot */,
+				77F0C008308BB00200A81371 /* DeskPilotTests */,
+				77F0C012308BB00200A81371 /* DeskPilotUITests */,
+				77F0C0A0308BB10000A81371 /* Shared */,
+				77F0C025308BB00800A81371 /* DeskPilotHost */,
+				77F0BFF9308BB00100A81371 /* Products */,
+				3F2EDD587548AE9F26A280BF /* Frameworks */,
+				7B679C23DA7165FC9B6B5929 /* DeskPilotHelper */,
+				CEB5611C4AC38894DE3B3447 /* tw.firstfu.DeskPilotHost.helper.plist */,
+			);
+			sourceTree = "<group>";
+		};
+		77F0BFF9308BB00100A81371 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				77F0BFF8308BB00100A81371 /* DeskPilot.app */,
+				77F0C005308BB00200A81371 /* DeskPilotTests.xctest */,
+				77F0C00F308BB00200A81371 /* DeskPilotUITests.xctest */,
+				77F0C024308BB00800A81371 /* DeskPilotHost.app */,
+				F72188C8C37BB73DB022B6EB /* DeskPilotHelper */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1357E7C33133E199D8B7BFEF /* DeskPilotHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 38D36D9805CAA321B2AB0DD6 /* Build configuration list for PBXNativeTarget "DeskPilotHelper" */;
+			buildPhases = (
+				4547F471CC1905D7D7521252 /* Sources */,
+				41598639E8F3A1AC6A39352F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				77F0C0A0308BB10000A81371 /* Shared */,
+				7B679C23DA7165FC9B6B5929 /* DeskPilotHelper */,
+			);
+			name = DeskPilotHelper;
+			productName = DeskPilotHelper;
+			productReference = F72188C8C37BB73DB022B6EB /* DeskPilotHelper */;
+			productType = "com.apple.product-type.tool";
+		};
+		77F0BFF7308BB00100A81371 /* DeskPilot */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77F0C017308BB00200A81371 /* Build configuration list for PBXNativeTarget "DeskPilot" */;
+			buildPhases = (
+				77F0BFF4308BB00100A81371 /* Sources */,
+				77F0BFF5308BB00100A81371 /* Frameworks */,
+				77F0BFF6308BB00100A81371 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				77F0BFFA308BB00100A81371 /* DeskPilot */,
+				77F0C0A0308BB10000A81371 /* Shared */,
+			);
+			name = DeskPilot;
+			productName = DeskPilot;
+			productReference = 77F0BFF8308BB00100A81371 /* DeskPilot.app */;
+			productType = "com.apple.product-type.application";
+		};
+		77F0C004308BB00200A81371 /* DeskPilotTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77F0C01A308BB00200A81371 /* Build configuration list for PBXNativeTarget "DeskPilotTests" */;
+			buildPhases = (
+				77F0C001308BB00200A81371 /* Sources */,
+				77F0C002308BB00200A81371 /* Frameworks */,
+				77F0C003308BB00200A81371 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				77F0C007308BB00200A81371 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				77F0C008308BB00200A81371 /* DeskPilotTests */,
+			);
+			name = DeskPilotTests;
+			productName = DeskPilotTests;
+			productReference = 77F0C005308BB00200A81371 /* DeskPilotTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		77F0C00E308BB00200A81371 /* DeskPilotUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77F0C01D308BB00200A81371 /* Build configuration list for PBXNativeTarget "DeskPilotUITests" */;
+			buildPhases = (
+				77F0C00B308BB00200A81371 /* Sources */,
+				77F0C00C308BB00200A81371 /* Frameworks */,
+				77F0C00D308BB00200A81371 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				77F0C011308BB00200A81371 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				77F0C012308BB00200A81371 /* DeskPilotUITests */,
+			);
+			name = DeskPilotUITests;
+			productName = DeskPilotUITests;
+			productReference = 77F0C00F308BB00200A81371 /* DeskPilotUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		77F0C023308BB00800A81371 /* DeskPilotHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77F0C02C308BB00900A81371 /* Build configuration list for PBXNativeTarget "DeskPilotHost" */;
+			buildPhases = (
+				77F0C020308BB00800A81371 /* Sources */,
+				77F0C021308BB00800A81371 /* Frameworks */,
+				77F0C022308BB00800A81371 /* Resources */,
+				FAF1A78A0FE3EAA354D41EF6 /* Embed DeskPilotHelper */,
+				5B079CDE77C0E867B4B7A016 /* Embed launchd plist */,
+				8116D639D2A8980F135E11FE /* Sign wireguard-go */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				37F49E3FD96384FA7878E570 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				77F0C025308BB00800A81371 /* DeskPilotHost */,
+				77F0C0A0308BB10000A81371 /* Shared */,
+			);
+			name = DeskPilotHost;
+			productName = DeskPilotHost;
+			productReference = 77F0C024308BB00800A81371 /* DeskPilotHost.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		77F0BFF0308BB00100A81371 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2710;
+				LastUpgradeCheck = 2710;
+				TargetAttributes = {
+					77F0BFF7308BB00100A81371 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					77F0C004308BB00200A81371 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = 77F0BFF7308BB00100A81371;
+					};
+					77F0C00E308BB00200A81371 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = 77F0BFF7308BB00100A81371;
+					};
+					77F0C023308BB00800A81371 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+				};
+			};
+			buildConfigurationList = 77F0BFF3308BB00100A81371 /* Build configuration list for PBXProject "DeskPilot" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 77F0BFEF308BB00100A81371;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 77F0BFF9308BB00100A81371 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				77F0BFF7308BB00100A81371 /* DeskPilot */,
+				77F0C004308BB00200A81371 /* DeskPilotTests */,
+				77F0C00E308BB00200A81371 /* DeskPilotUITests */,
+				77F0C023308BB00800A81371 /* DeskPilotHost */,
+				1357E7C33133E199D8B7BFEF /* DeskPilotHelper */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		77F0BFF6308BB00100A81371 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C003308BB00200A81371 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C00D308BB00200A81371 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C022308BB00800A81371 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		8116D639D2A8980F135E11FE /* Sign wireguard-go */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Sign wireguard-go";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "BIN=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/wireguard-go\"\nif [ ! -f \"$BIN\" ]; then\n  echo \"warning: 找不到 wireguard-go，請先跑 scripts/build-wireguard-go.sh（外網通道無法啟動）\"\n  exit 0\nfi\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --identifier tw.firstfu.DeskPilotHost.wireguard-go --options runtime \"$BIN\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4547F471CC1905D7D7521252 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0BFF4308BB00100A81371 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C001308BB00200A81371 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C00B308BB00200A81371 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77F0C020308BB00800A81371 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		37F49E3FD96384FA7878E570 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = DeskPilotHelper;
+			target = 1357E7C33133E199D8B7BFEF /* DeskPilotHelper */;
+			targetProxy = 4F0482767B312EE266112629 /* PBXContainerItemProxy */;
+		};
+		77F0C007308BB00200A81371 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 77F0BFF7308BB00100A81371 /* DeskPilot */;
+			targetProxy = 77F0C006308BB00200A81371 /* PBXContainerItemProxy */;
+		};
+		77F0C011308BB00200A81371 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 77F0BFF7308BB00100A81371 /* DeskPilot */;
+			targetProxy = 77F0C010308BB00200A81371 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		128664B382BF68485389920C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = WY468E45SJ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				OTHER_CODE_SIGN_FLAGS = "--identifier tw.firstfu.DeskPilotHost.helper";
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotHost.helper;
+				PRODUCT_NAME = DeskPilotHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		77F0C015308BB00200A81371 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		77F0C016308BB00200A81371 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		77F0C018308BB00200A81371 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WY468E45SJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DeskPilot/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DeskPilot 需要存取區域網路，才能找到並連線到你的電腦。";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilot;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		77F0C019308BB00200A81371 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WY468E45SJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DeskPilot/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DeskPilot 需要存取區域網路，才能找到並連線到你的電腦。";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilot;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		77F0C01B308BB00200A81371 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DeskPilot.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DeskPilot";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		77F0C01C308BB00200A81371 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DeskPilot.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DeskPilot";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		77F0C01E308BB00200A81371 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = DeskPilot;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		77F0C01F308BB00200A81371 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = DeskPilot;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		77F0C02D308BB00900A81371 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WY468E45SJ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DeskPilotHost/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DeskPilot 需要在區域網路上公告這台電腦，讓你的手機能找到並連線。";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotHost;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		77F0C02E308BB00900A81371 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WY468E45SJ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DeskPilotHost/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DeskPilot 需要在區域網路上公告這台電腦，讓你的手機能找到並連線。";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotHost;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		BA38242DC44997449ECD5ECA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = WY468E45SJ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				OTHER_CODE_SIGN_FLAGS = "--identifier tw.firstfu.DeskPilotHost.helper";
+				PRODUCT_BUNDLE_IDENTIFIER = tw.firstfu.DeskPilotHost.helper;
+				PRODUCT_NAME = DeskPilotHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		38D36D9805CAA321B2AB0DD6 /* Build configuration list for PBXNativeTarget "DeskPilotHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				128664B382BF68485389920C /* Release */,
+				BA38242DC44997449ECD5ECA /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77F0BFF3308BB00100A81371 /* Build configuration list for PBXProject "DeskPilot" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77F0C015308BB00200A81371 /* Debug */,
+				77F0C016308BB00200A81371 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77F0C017308BB00200A81371 /* Build configuration list for PBXNativeTarget "DeskPilot" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77F0C018308BB00200A81371 /* Debug */,
+				77F0C019308BB00200A81371 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77F0C01A308BB00200A81371 /* Build configuration list for PBXNativeTarget "DeskPilotTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77F0C01B308BB00200A81371 /* Debug */,
+				77F0C01C308BB00200A81371 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77F0C01D308BB00200A81371 /* Build configuration list for PBXNativeTarget "DeskPilotUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77F0C01E308BB00200A81371 /* Debug */,
+				77F0C01F308BB00200A81371 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77F0C02C308BB00900A81371 /* Build configuration list for PBXNativeTarget "DeskPilotHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77F0C02D308BB00900A81371 /* Debug */,
+				77F0C02E308BB00900A81371 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 77F0BFF0308BB00100A81371 /* Project object */;
+}

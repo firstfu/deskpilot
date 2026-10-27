@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>連線到 Mac 前確認是你本人，手機遺失時別人無法拿來控制電腦。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_deskpilot._tcp</string>
+	</array>
+</dict>
+</plist>
