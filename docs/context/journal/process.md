@@ -4,6 +4,12 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-10-28 — 整理對外發布現況與待辦（尚未 commit）
+
+- **變更**：新增 `reference/release.md`（只談 Mac 主機），根 `CLAUDE.md` 索引補一列。
+- **為什麼**：使用者問「發新版後用戶下載安裝能否馬上用」，並指出 Liftoff 沒這問題、且 iPhone 端不用管。結論：Mac 端可比照 Liftoff 用自簽憑證＋zip＋cask＋Open Anyway 發布，不需付費帳號；唯一卡點是外網 helper 的簽章要求寫死 Apple Team ID，自簽下會被拒。
+- **下一步**：先發區網版（外網預設關）；外網端到端實測後，把 helper 簽章要求改成憑證雜湊並驗證 `SMAppService.daemon` 可註冊。
+
 ### 2026-10-28 — 照 Liftoff 的做法重寫 GitHub 門面（`06f0729`）
 
 - **變更**：`README.md` 改寫為英文主版（置中標題＋標語＋徽章＋語言切換列＋「目前沒有下載版」提醒框，依序 Why／Features／Status／Build from source／Remote access／Security model／FAQ 折疊區／Project layout／Contributing／License），新增 `translations/README.zh-Hant.md` 繁中對應版；新增 `CONTRIBUTING.md`（回報 bug／建議功能／送 PR 三條路，指向 `boundaries.md`、`protocol.md`）；新增 `.github/ISSUE_TEMPLATE/`（`bug_report.yml`、`feature_request.yml` 中英雙語，`config.yml` 關閉空白 issue）。授權標示維持 MIT（不是 Liftoff 的 GPLv3）。
