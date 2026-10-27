@@ -4,7 +4,7 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
-### 2026-10-28 — 整理對外發布現況與待辦（尚未 commit）
+### 2026-10-28 — 整理對外發布現況與待辦（`5aacc4d`）
 
 - **變更**：新增 `reference/release.md`（只談 Mac 主機），根 `CLAUDE.md` 索引補一列。
 - **為什麼**：使用者問「發新版後用戶下載安裝能否馬上用」，並指出 Liftoff 沒這問題、且 iPhone 端不用管。結論：Mac 端可比照 Liftoff 用自簽憑證＋zip＋cask＋Open Anyway 發布，不需付費帳號；唯一卡點是外網 helper 的簽章要求寫死 Apple Team ID，自簽下會被拒。
