@@ -19,6 +19,7 @@
 | 可達性 | `ExternalAccess/Reachability.swift` | 比對「路由器自己的 WAN 位址」與「外部服務看到的公網位址」，判斷直連可不可行 |
 | 協調 | `ExternalAccess/ExternalAccessController.swift` | 開關狀態機；每 10 分鐘續約開埠＋重檢＋確保通道在跑；公網 IP 變動時提示；關閉時取消對映並停通道 |
 | helper 客戶端 | `ExternalAccess/HelperClient.swift` | `SMAppService.daemon` 註冊、XPC 呼叫、重新安裝 |
+| 固定網域 | `ExternalAccess/CloudflareDDNS.swift`、`DDNSSettingsView.swift` | 使用者填自己的 Cloudflare 主機名稱＋API Token（Token 存鑰匙圈），每輪檢查把 A 記錄（僅 DNS、TTL 60）更新成目前公網 IP；成功時 QR 的 Endpoint 改放名稱 |
 | 配對 | `ExternalAccess/PairingView.swift` | 產生手機金鑰對與 QR code |
 | helper 本體 | `DeskPilotHelper/main.swift`、`TunnelManager.swift` | 以 root 啟停 `wireguard-go`、管金鑰與 peer |
 | XPC 介面 | `Shared/HelperProtocol.swift` | 方法清單與簽章要求字串 |
@@ -71,7 +72,8 @@ Homebrew 版 `wireguard-go` 的 utun 介面，Network.framework 看不到、`NWL
 
 ## 現況限制
 
-- QR code 內的 Endpoint 是**當下的公網 IP**；IP 變動後手機就連不上，要重新產生 QR（選單會提示「公網位址已變更」）。尚無自訂主機名稱／DDNS 欄位。
+- 沒設定固定網域時，QR code 內的 Endpoint 是**當下的公網 IP**；IP 變動後手機就連不上，要重新產生 QR（選單會提示「公網位址已變更」）。
+- 固定網域（Cloudflare DDNS，2026-10-28 加入）：選單「設定固定網域」填主機名稱與 Token（權限：區域 › DNS › 編輯，範圍只選該網域）。更新成功後 QR 用名稱，IP 變動不必重掃。**僅 build 通過，尚未用真實 Cloudflare 帳號與手機實測**；待驗：手機官方 WireGuard 換 IP 後重開通道是否重新解析名稱。自簽憑證換掉後鑰匙圈可能讀不到舊 Token，需重填。
 - CGNAT 或雙層 NAT 下直連不可能，App 只偵測並告知，不提供中繼。
 - 通道內防火牆（只放行 DeskPilot 的 TCP 52830、其他連接埠一律擋）**尚未實作**：目前 peer 的 AllowedIPs 已限制手機只能到 Mac 的通道位址，但綁在 `0.0.0.0` 的其他本機服務仍可能從通道位址被連到。
 - 端到端（手機行動網路 → 通道 → DeskPilot 連線成功）**尚待實測**。已驗證的是：Mac 端開埠與取消、helper 以 root 執行與冒充連線被拒、通道啟停無殘留、輸入驗證、通道上收到手機封包並到達主機交握。

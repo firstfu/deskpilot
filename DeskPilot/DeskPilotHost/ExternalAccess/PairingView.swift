@@ -18,10 +18,7 @@ final class PairingModel {
 
     func generate(helper: HelperClient, external: ExternalAccessController) async {
         qr = nil
-        let host: String
-        switch external.state {
-        case .ready(let ip, _), .needsManualForward(let ip): host = ip
-        default:
+        guard let host = external.endpointHost else {
             message = "外網連線尚未就緒，請先開啟選單裡的「外網連線」並等狀態顯示可連入。"
             return
         }

@@ -29,6 +29,12 @@ struct DeskPilotHostApp: App {
         .windowResizability(.contentSize)
         .defaultLaunchBehavior(.suppressed)
 
+        Window("固定網域", id: "ddns") {
+            DDNSSettingsView(external: external)
+        }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
+
         Window("配對手機", id: "pair") {
             PairingView(helper: helper, external: external)
         }
@@ -104,6 +110,12 @@ private struct MenuContent: View {
         if external.isEnabled { Text(externalText) }
         if external.publicIPChanged {
             Button("公網位址已變更，手機需更新（按此確認）") { external.acknowledgeIPChange() }
+        }
+        if external.isEnabled {
+            Button(external.ddnsHostname.isEmpty ? "設定固定網域（Cloudflare）…" : "固定網域：\(external.ddnsHostname)…") {
+                openWindow(id: "ddns")
+                NSApp.activate()
+            }
         }
         helperItems
         Divider()

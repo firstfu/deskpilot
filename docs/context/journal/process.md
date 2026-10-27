@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-10-28 — 外網加 Cloudflare 固定網域（DDNS）
+
+- **變更**：新增 `CloudflareDDNS.swift`（API 更新 A 記錄、Token 存鑰匙圈）與 `DDNSSettingsView.swift`（選單「設定固定網域」視窗）；`ExternalAccessController` 每輪檢查順便更新 DNS，並提供 `endpointHost`；`PairingView` 的 Endpoint 改用它。
+- **為什麼**：QR 內記公網 IP，IP 一變手機就斷，外網對一般用戶不實用。選用戶自備 Cloudflare 網域的做法（A），不自架服務。
+- **驗證**：`xcodebuild` DeskPilotHost build 成功；**尚未用真實帳號與手機實測**。
+- **下一步**：自己填網域與 Token 實測；確認手機換 IP 後重開通道會重新解析；之後處理 helper 簽章要求（自簽下外網仍被擋）。
+
 ### 2026-10-28 — 整理對外發布現況與待辦（`5aacc4d`）
 
 - **變更**：新增 `reference/release.md`（只談 Mac 主機），根 `CLAUDE.md` 索引補一列。

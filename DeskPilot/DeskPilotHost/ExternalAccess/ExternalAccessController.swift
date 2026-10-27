@@ -36,6 +36,27 @@ final class ExternalAccessController {
     /// 用 @Observable 儲存屬性（而不是直接讀 UserDefaults），選單的勾選才會即時更新。
     private(set) var isEnabled = UserDefaults.standard.bool(forKey: "externalAccessEnabled")
 
+    enum DDNSStatus: Equatable {
+        case notConfigured
+        case updating
+        case ok
+        case failed(String)
+    }
+
+    private static let ddnsHostKey = "externalAccessDDNSHostname"
+    /// 使用者在 Cloudflare 的主機名稱；有設定且最近一次更新成功時，QR code 改用它當 Endpoint。
+    private(set) var ddnsHostname = UserDefaults.standard.string(forKey: "externalAccessDDNSHostname") ?? ""
+    private(set) var ddnsStatus: DDNSStatus = .notConfigured
+
+    /// 手機該連的位址：DDNS 可用時是主機名稱，否則是公網 IP。
+    var endpointHost: String? {
+        switch state {
+        case .ready(let ip, _), .needsManualForward(let ip):
+            return ddnsStatus == .ok && !ddnsHostname.isEmpty ? ddnsHostname : ip
+        default: return nil
+        }
+    }
+
     private var loop: Task<Void, Never>?
     /// 特權 helper；就緒時，外網開關同時負責啟停 WireGuard 通道。
     var helper: HelperClient?
@@ -71,6 +92,46 @@ final class ExternalAccessController {
 
     func acknowledgeIPChange() { publicIPChanged = false }
 
+    /// 儲存 DDNS 設定；空的主機名稱代表停用並清掉 Token。回傳錯誤訊息，成功為 nil。
+    func configureDDNS(hostname: String, token: String) async -> String? {
+        let name = hostname.trimmingCharacters(in: .whitespaces).lowercased()
+        if name.isEmpty {
+            DDNSKeychain.deleteToken()
+            UserDefaults.standard.removeObject(forKey: Self.ddnsHostKey)
+            ddnsHostname = ""
+            ddnsStatus = .notConfigured
+            return nil
+        }
+        guard CloudflareDDNS.isValidHostname(name) else { return DDNSError.invalidHostname.localizedDescription }
+        let tok = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 留空代表沿用鑰匙圈裡已存的 Token
+        guard let useToken = tok.isEmpty ? DDNSKeychain.loadToken() : tok else { return "請輸入 API Token" }
+        guard let ip = await Reachability.fetchPublicIP() else { return "查不到公網 IP，請確認網路" }
+        do {
+            try await CloudflareDDNS.update(hostname: name, ip: ip, token: useToken)
+        } catch {
+            return error.localizedDescription
+        }
+        if !tok.isEmpty { DDNSKeychain.saveToken(tok) }
+        UserDefaults.standard.set(name, forKey: Self.ddnsHostKey)
+        ddnsHostname = name
+        ddnsStatus = .ok
+        publicIPChanged = false
+        return nil
+    }
+
+    private func updateDDNS(ip: String) async {
+        guard !ddnsHostname.isEmpty, let token = DDNSKeychain.loadToken() else { return }
+        ddnsStatus = .updating
+        do {
+            try await CloudflareDDNS.update(hostname: ddnsHostname, ip: ip, token: token)
+            ddnsStatus = .ok
+        } catch {
+            Self.log.error("DDNS 更新失敗：\(error.localizedDescription, privacy: .public)")
+            ddnsStatus = .failed(error.localizedDescription)
+        }
+    }
+
     private func refresh() async {
         state = .checking
         var mapping: PortMapping?
@@ -85,6 +146,7 @@ final class ExternalAccessController {
         case .behindNAT(let router, _):
             state = .blockedByNAT(routerIP: router)
         case .direct(let ip):
+            await updateDDNS(ip: ip)
             noteIP(ip)
             if mapping == nil {
                 Self.log.notice("自動開埠失敗：\(mapError?.localizedDescription ?? "未知", privacy: .public)")
@@ -97,7 +159,8 @@ final class ExternalAccessController {
 
     private func noteIP(_ ip: String) {
         let defaults = UserDefaults.standard
-        if let old = defaults.string(forKey: Self.lastIPKey), old != ip {
+        // DDNS 已把名稱指到新 IP，手機不必更新
+        if let old = defaults.string(forKey: Self.lastIPKey), old != ip, ddnsStatus != .ok {
             publicIPChanged = true
             Self.log.notice("公網位址已變更")
         }
