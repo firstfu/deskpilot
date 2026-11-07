@@ -67,6 +67,9 @@ helper 是 root 常駐、按需啟動，重新 build 只換了磁碟上的檔案
 ### 通道介面可能不會登記到系統網路設定
 Homebrew 版 `wireguard-go` 的 utun 介面，Network.framework 看不到、`NWListener` 不會在上面收連線，所以才有 `TunnelRelay`（BSD socket 監聽通道位址再轉到本機），細節見 `host.md`。內建版沿用同一套轉接，**沒有另外驗證**內建版的 utun 是否也有這個行為；已知的是 `TunnelRelay` 在 `10.66.0.1:52830` 監聽成功、手機的交握封包能經它到達主機。
 
+### Mac 端全正常、手機就是連不上：多半是手機金鑰跟 Mac 對不上
+金鑰不符的握手，WireGuard 會直接丟掉、不回應，兩邊都不會報錯。2026-11-07 的情況：開埠、公網 IP、防火牆、通道全部正常，但 `netstat -I utun<N> -b` 的 `Ipkts` 一直是 0。手機重掃一張新 QR 之後就連上了。**每產生一次 QR，舊手機就失效**，Mac 重新配對過的話手機一定要重掃。排查順序：`Ipkts` 為 0 → 跑 `sudo tcpdump -ni en0 udp port 51820` 讓手機試連：有進來的封包卻沒握手代表金鑰不符（重掃 QR），完全沒封包則問題在電信或路由器那段。
+
 ### 外網開關的勾選不更新
 見 `host.md`「`@Observable` 不追蹤 `UserDefaults`」。
 
@@ -76,4 +79,4 @@ Homebrew 版 `wireguard-go` 的 utun 介面，Network.framework 看不到、`NWL
 - 固定網域（Cloudflare DDNS，2026-10-28 加入）：選單「設定固定網域」填主機名稱與 Token（權限：區域 › DNS › 編輯，範圍只選該網域）。更新成功後 QR 用名稱，IP 變動不必重掃。**僅 build 通過，尚未用真實 Cloudflare 帳號與手機實測**；待驗：手機官方 WireGuard 換 IP 後重開通道是否重新解析名稱。自簽憑證換掉後鑰匙圈可能讀不到舊 Token，需重填。
 - CGNAT 或雙層 NAT 下直連不可能，App 只偵測並告知，不提供中繼。
 - 通道內防火牆（只放行 DeskPilot 的 TCP 52830、其他連接埠一律擋）**尚未實作**：目前 peer 的 AllowedIPs 已限制手機只能到 Mac 的通道位址，但綁在 `0.0.0.0` 的其他本機服務仍可能從通道位址被連到。
-- 端到端（手機行動網路 → 通道 → DeskPilot 連線成功）**尚待實測**。已驗證的是：Mac 端開埠與取消、helper 以 root 執行與冒充連線被拒、通道啟停無殘留、輸入驗證、通道上收到手機封包並到達主機交握。
+- 端到端（手機行動網路 → 通道 → DeskPilot 連線成功）**已於 2026-11-07 實測成功**（IP Endpoint、沒設固定網域；`tcpdump` 看到雙向大量封包、畫面可操作）。其他已驗證：Mac 端開埠與取消、helper 以 root 執行與冒充連線被拒、通道啟停無殘留、輸入驗證。

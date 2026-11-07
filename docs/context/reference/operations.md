@@ -40,7 +40,7 @@
 
 - 使用者在選單列打開「外網連線（自動開埠）」＋「安裝外網通道元件…」（要到系統設定「登入項目」核准一次）＋「配對手機（外網）…」顯示 QR code，用手機官方 WireGuard App 掃描；手機關 Wi-Fi、開通道、DeskPilot「在外面」輸入 `10.66.0.1`。**首次配對要人在 Mac 旁邊**（Mac 上要核對 6 位數並按允許，也可以直接在通道上配對；或先在區網配對一次）。
 - 不再需要手動的 `/etc/wireguard`、LaunchDaemon、`upnp-map.py`、DDNS 腳本。這些在 2026-10-27 查證時，這台 Mac 上已不存在。
-- 看通道狀態：helper 的 `tunnelStatus`（要簽章相符的呼叫端）；不需要 root 的方法是 `netstat -I utun<N> -b`（`Ipkts` 是從手機收到的封包，0 代表手機還沒送到）與 `ifconfig`（看有沒有 `10.66.0.1`）。看 `wg show` 之類需要 root。
+- 看通道狀態：helper 的 `tunnelStatus`（要簽章相符的呼叫端）；不需要 root 的方法是 `netstat -I utun<N> -b`（`Ipkts` 是從手機收到的封包，0 代表手機還沒送到）與 `ifconfig`（看有沒有 `10.66.0.1`）。看 `wg show` 之類需要 root。外網連不上時的排查順序見 `modules/external-access.md`「Mac 端全正常、手機就是連不上」。
 - Mac 連自己的通道位址會繞進 WireGuard，**無法在本機測外網路徑**，只能用手機行動網路實測。
 - 換 helper 版本要 `sudo launchctl kickstart -k system/tw.firstfu.DeskPilotHost.helper`；App 搬位置要選單「重新安裝通道元件」。
 

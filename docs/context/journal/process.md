@@ -4,6 +4,12 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-07 — 外網端到端第一次實測成功
+
+- **變更**：沒改程式碼。`external-access.md` 的「現況限制」把端到端改成已驗證，並新增「手機金鑰不符」這個雷；`operations.md` 加上指過去的排查連結。
+- **為什麼**：使用者回報從外網連不上。查過 Mac 端：主機、helper、`wireguard-go` 都在跑，UPnP 對映 UDP 51820 有指到本機，路由器 WAN 位址就是公網位址，防火牆放行，但通道 `Ipkts` 一直是 0。手機重掃 QR 之後連上了，`tcpdump` 看得到雙向大量封包。研判是手機用了舊的 QR，或根本沒匯入，金鑰對不上，握手被默默丟掉。
+- **下一步**：實測 Cloudflare 固定網域與 IP 變動後重新解析；做通道內防火牆；README 的「目前狀態」表格更新外網這一列。
+
 ### 2026-10-28 — 外網加 Cloudflare 固定網域（DDNS）
 
 - **變更**：新增 `CloudflareDDNS.swift`（API 更新 A 記錄、Token 存鑰匙圈）與 `DDNSSettingsView.swift`（選單「設定固定網域」視窗）；`ExternalAccessController` 每輪檢查順便更新 DNS，並提供 `endpointHost`；`PairingView` 的 Endpoint 改用它。
