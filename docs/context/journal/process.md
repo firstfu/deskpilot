@@ -4,7 +4,7 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
-### 2026-11-15 — 加上 App 圖示（尚未 commit）
+### 2026-11-15 — 加上 App 圖示（`7468804`）
 
 - **變更**：新增 `scripts/make-app-icons.sh`（SVG 寫在腳本裡，用 `rsvg-convert` 輸出），產生 iOS 滿版 1024 圖示與 Mac 主機 16～1024 各尺寸（824 圓角方形加陰影）；兩個 `AppIcon.appiconset` 的 `Contents.json` 改成只列實際有圖的欄位。圖案是深藍底、漸層螢幕色塊加白色游標，兩端共用。
 - **為什麼**：使用者要求 App 加上好看的圖示，原本兩端都是空白預設圖示。參考了 Dribbble「macos app icon display」的深色底單一發光圖形，以及 Edovia Screens 圖示的漸層螢幕色塊，只借鏡構圖。
