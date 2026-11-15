@@ -70,6 +70,12 @@ Homebrew 版 `wireguard-go` 的 utun 介面，Network.framework 看不到、`NWL
 ### Mac 端全正常、手機就是連不上：多半是手機金鑰跟 Mac 對不上
 金鑰不符的握手，WireGuard 會直接丟掉、不回應，兩邊都不會報錯。2026-11-07 的情況：開埠、公網 IP、防火牆、通道全部正常，但 `netstat -I utun<N> -b` 的 `Ipkts` 一直是 0。手機重掃一張新 QR 之後就連上了。**每產生一次 QR，舊手機就失效**，Mac 重新配對過的話手機一定要重掃。排查順序：`Ipkts` 為 0 → 跑 `sudo tcpdump -ni en0 udp port 51820` 讓手機試連：有進來的封包卻沒握手代表金鑰不符（重掃 QR），完全沒封包則問題在電信或路由器那段。
 
+### helper 註冊會無故消失，主機重啟不會自動修好
+2026-11-15 實例：外網連不進來，`launchctl print system/tw.firstfu.DeskPilotHost.helper` 回 `Could not find service`，即使 App 路徑沒變（所以不是上一條「App 搬位置」）。helper 不在時，主機重啟後 `wireguard-go` 不會被啟動、utun 也不會出現 10.66.0.1。成因沒查出來。**修法**：選單「重新安裝通道元件」→ 核准登入項目 → **再重啟一次主機**。helper 剛重裝時主機通常已先啟動、`HelperClient.status` 還是舊的，`ExternalAccessController` 的迴圈要等 10 分鐘才會重試。重啟後用 `ifconfig` 找 10.66.0.1、`netstat -I utun<N> -b` 看 `Ipkts`，並重掃 QR（見上一條）。`startTunnel` 用 `try?` 吞掉 XPC 錯誤，這種狀況不會有 log，只能手動查。
+
+### zsh 的 `log` 要用 `/usr/bin/log`
+查主機 log 時，zsh 的內建 `log` 會蓋掉系統指令，報 `too many arguments`。用 `/usr/bin/log show --last 10m --info --debug --predicate 'subsystem == "tw.firstfu.DeskPilotHost"' --style compact`。
+
 ### 外網開關的勾選不更新
 見 `host.md`「`@Observable` 不追蹤 `UserDefaults`」。
 
