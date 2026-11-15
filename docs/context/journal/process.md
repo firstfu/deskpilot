@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-15 — 加上 App 圖示（尚未 commit）
+
+- **變更**：新增 `scripts/make-app-icons.sh`（SVG 寫在腳本裡，用 `rsvg-convert` 輸出），產生 iOS 滿版 1024 圖示與 Mac 主機 16～1024 各尺寸（824 圓角方形加陰影）；兩個 `AppIcon.appiconset` 的 `Contents.json` 改成只列實際有圖的欄位。圖案是深藍底、漸層螢幕色塊加白色游標，兩端共用。
+- **為什麼**：使用者要求 App 加上好看的圖示，原本兩端都是空白預設圖示。參考了 Dribbble「macos app icon display」的深色底單一發光圖形，以及 Edovia Screens 圖示的漸層螢幕色塊，只借鏡構圖。
+- **驗證**：`DeskPilotHost` 與 `DeskPilot`（iOS 模擬器）build 成功，主機 App 內有 `AppIcon.icns`。**尚未在實機主畫面與 Dock 上看過**。
+- **下一步**：重開主機、重裝手機 App 後確認實際顯示；需要的話補 iOS 深色與單色版本。
+
 ### 2026-11-07 — 外網端到端第一次實測成功（`e6f6840`）
 
 - **變更**：沒改程式碼。`external-access.md` 的「現況限制」把端到端改成已驗證，並新增「手機金鑰不符」這個雷；`operations.md` 加上指過去的排查連結。
