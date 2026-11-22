@@ -489,8 +489,10 @@ final class ClientLink: @unchecked Sendable {
 
     init(endpoint: NWEndpoint, host: DiscoveredHost) {
         self.host = host
-        framed = FramedConnection(connection: NWConnection(to: endpoint, using: FramedConnection.tcpParameters()),
-                                  queue: queue)
+        // 網址（wss://，經 Cloudflare Tunnel）走 WebSocket，其餘（Bonjour、IP）走原本的 TCP
+        let params: NWParameters
+        if case .url = endpoint { params = FramedConnection.webSocketParameters() } else { params = FramedConnection.tcpParameters() }
+        framed = FramedConnection(connection: NWConnection(to: endpoint, using: params), queue: queue)
     }
 
     /// 連上後第一件事：送交握。有存過這台主機的金鑰就走驗證，沒有就發起配對。

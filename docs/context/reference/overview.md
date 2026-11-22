@@ -6,7 +6,7 @@ DeskPilot：用 iPhone 在區網（Wi-Fi）內操控 Mac 的遠端桌面 App。�
 
 - 原始碼：`~/Desktop/deskpilot`；公開 GitHub repo：https://github.com/firstfu/deskpilot（`main`）
 - 連線一律加密並需配對（協定 v4，2026-10-26）：首次在 Mac 上核對 6 位數並允許，之後以 Keychain 金鑰自動驗證；手機連線前要 Face ID。細節見 `modules/protocol.md`。
-- 區網靠 Bonjour 自動找主機；**外網**透過 WireGuard 通道（Mac 當伺服器），**內建於 Mac App**：自動向路由器開埠（NAT-PMP／UPnP）、以特權 helper（root LaunchDaemon）啟停 `wireguard-go`、選單顯示 QR code 給手機的官方 WireGuard App 一次性匯入，手機再手動輸入通道位址 `10.66.0.1` 連線。主機只接受私有網段來源，DeskPilot 本身不直接暴露在公網。機制見 `modules/external-access.md`，維運見 `operations.md`。
+- 區網靠 Bonjour 自動找主機；**外網主路徑是 Cloudflare Tunnel**（2026-11-20 起）：Mac 上的 `cloudflared` 主動連到 Cloudflare，把 `wss://<網域>` 還原成到本機 TCP 52830 的連線，手機「在外面」直接輸入網域，不需要開埠、不怕公網 IP 變動，主機程式碼不用改。**備援**是 WireGuard 通道（Mac 當伺服器），**內建於 Mac App**：自動向路由器開埠（NAT-PMP／UPnP）、以特權 helper（root LaunchDaemon）啟停 `wireguard-go`、選單顯示 QR code 給手機的官方 WireGuard App 一次性匯入，手機再手動輸入通道位址 `10.66.0.1` 連線。主機只接受私有網段來源，DeskPilot 本身不直接暴露在公網。機制見 `modules/external-access.md`，維運見 `operations.md`。
 
 ## 組成
 

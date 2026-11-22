@@ -45,6 +45,8 @@ iOS App。`ClientSession`（主執行緒狀態）＋ `ClientLink`（自己的序
 
 ## 手動輸入 IP（外網）與配對
 
+輸入框（`HostListScreen.manualEndpoint`）：純 IPv4／IPv6 → TCP 52830（WireGuard 通道位址）；其他字串視為網域，補成 `wss://<網域>` 走 Cloudflare Tunnel（機制見 `external-access.md`「主路徑」）。兩條路徑都沒有 Bonjour 主機 ID，配對規則相同。
+
 「在外面」輸入通道位址 `10.66.0.1` 連線，沒有 Bonjour 公告的主機 ID。行為與已知的坑見 `protocol.md`「配對與加密」（Keychain 保留舊紀錄、`authFailed` 重試迴圈、`forcePairNext`）。手機端的外網通道由官方 WireGuard App 提供，DeskPilot 本身不建通道。
 
 ## 連線前驗證本人

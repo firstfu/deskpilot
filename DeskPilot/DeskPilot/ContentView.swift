@@ -33,6 +33,16 @@ struct HostListScreen: View {
     /// 上次手動輸入的位址（例如 WireGuard 通道裡的 Mac：10.66.0.1）。
     @AppStorage("manualHostAddress") private var manualAddress = "10.66.0.1"
 
+    /// 手動輸入轉成連線目標：純 IP 走 TCP 52830；網域（或 wss:// 網址）走 Cloudflare Tunnel 的 WebSocket。
+    static func manualEndpoint(_ input: String) -> NWEndpoint? {
+        if IPv4Address(input) != nil || IPv6Address(input) != nil {
+            return .hostPort(host: NWEndpoint.Host(input), port: NWEndpoint.Port(rawValue: ProtocolConstants.port)!)
+        }
+        let urlString = input.contains("://") ? input : "wss://\(input)"
+        guard let url = URL(string: urlString), url.scheme == "wss", url.host != nil else { return nil }
+        return .url(url)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -57,24 +67,22 @@ struct HostListScreen: View {
 
                 Section {
                     HStack {
-                        TextField("IP 位址", text: $manualAddress)
-                            .keyboardType(.numbersAndPunctuation)
+                        TextField("網域或 IP 位址", text: $manualAddress)
+                            .keyboardType(.URL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         Button("連線") {
                             let addr = manualAddress.trimmingCharacters(in: .whitespaces)
                             guard !addr.isEmpty else { return }
-                            let host = DiscoveredHost(name: addr,
-                                                      endpoint: .hostPort(host: NWEndpoint.Host(addr),
-                                                                          port: NWEndpoint.Port(rawValue: ProtocolConstants.port)!),
-                                                      hostID: nil)
+                            guard let endpoint = Self.manualEndpoint(addr) else { return }
+                            let host = DiscoveredHost(name: addr, endpoint: endpoint, hostID: nil)
                             session.connect(to: host, viewPixels: Self.screenPixels)
                         }
                     }
                 } header: {
-                    Text("在外面（透過 WireGuard）")
+                    Text("在外面")
                 } footer: {
-                    Text("先打開 WireGuard App，再輸入 Mac 的通道位址連線。第一次配對必須在同一個 Wi-Fi 下完成。")
+                    Text("輸入 Mac 的 Cloudflare Tunnel 網域（例如 deskpilot.example.com）直接連線；或先打開 WireGuard App，再輸入通道位址 10.66.0.1。第一次配對必須在同一個 Wi-Fi 下完成。")
                 }
 
                 if case .connecting(let name) = session.state {

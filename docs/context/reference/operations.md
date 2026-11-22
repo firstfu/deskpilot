@@ -19,6 +19,7 @@
 - build＋安裝：`xcodebuild -project DeskPilot/DeskPilot.xcodeproj -scheme DeskPilot -configuration Debug -destination 'id=<UDID>' -derivedDataPath <目錄> -allowProvisioningUpdates build`，再 `xcrun devicectl device install app --device <UDID> <目錄>/Build/Products/Debug-iphoneos/DeskPilot.app`。安裝偶爾回 `Connection invalid`，重跑一次通常就好。
 - **即時看手機端輸出**：`xcrun devicectl device process launch --console --terminate-existing --device <UDID> tw.firstfu.DeskPilot`，App 的 stdout 會串回終端機。手機鎖定時會失敗（`Locked`），要先解鎖。2026-10-26 排查「兩端都說對方先斷線」就是靠這個確認手機端沒有主動斷。
 - 免費開發者帳號簽的 App 約 7 天後簽章過期、App 打不開，要重新安裝。
+- `devicectl device install` 在手機鎖定或不在同一網路時同樣回 `error 4016`；免費帳號沒有其他安裝管道，人在外面裝不到（見 `release.md`「iPhone 端：免費帳號裝不到遠端」）。
 - 有多支實體 iPhone 都配對過時，`devicectl list devices` 會全列出來，**先跟使用者確認要裝哪一支**，別猜。
 - **手機在行動網路（對 Mac 不可達）時**，`devicectl` 顯示 `unavailable`，`process launch --console` 回 `error 4016`，看不到手機端 log；要看手機 log 得讓手機連回同一個 Wi-Fi（鎖屏另外會回 `Locked`）。測外網時因此只能靠 Mac 端 log 與 `netstat -I utun<N> -b` 的封包計數。
 
@@ -28,13 +29,24 @@
   - RunProject 重跑時舊主機程序不會結束，Bonjour 名稱會變成「…(2)」「…(3)」，手機清單出現多個主機、點到舊的就連不上。
   - Xcode 的 StopProject 停的是「目前 scheme 的 App」，切到 iOS scheme 後按停止會把手機端 App 停掉，而不是主機。
 - 每次重開前先 `pkill -f DeskPilotHost.app`。
+- **重開機後主機不會自己起來**（cloudflared 的 LaunchAgent 會），兩條外網路徑都會因此連不上。2026-11-23 已用 System Events 把 DerivedData 裡的 `DeskPilotHost.app` 加進登入項目；換 build 路徑要重加。
 - macOS 防火牆開著時，**重 build 主機後可能被改成阻擋連入**，區網與外網都會連不上，處理方式見 `modules/host.md`「重 build 主機後被防火牆擋」。
 - 量測腳本 `scripts/host-bench.sh`：
   - `start [hevc|h264] [位元率 bps]`：重開主機（預設 HEVC、2 Mbps），並排除 Device Hub 視窗。
   - `report`：等待並印出最新一次手機量測回報與編碼器資訊。
 - 主機可用的環境變數：`DESKPILOT_CODEC`、`DESKPILOT_BITRATE`、`DESKPILOT_EXCLUDE_BUNDLES`（逗號分隔的 bundle id，不擷取這些 App）。
 
-## 外網連線（內建於 Mac App）
+## Cloudflare Tunnel（外網主路徑）
+
+機制見 `modules/external-access.md`「主路徑」。這台 Mac 的設定都在 repo 外：
+
+- `cloudflared`（Homebrew）＋已登入的 `~/.cloudflared/cert.pem`；Tunnel 名稱 `deskpilot`，設定檔 `~/.cloudflared/deskpilot.yml`（ingress：網域 → `tcp://127.0.0.1:52830`），憑證 `~/.cloudflared/<tunnel-id>.json`（勿外洩、勿進 repo）。
+- 常駐：使用者層 LaunchAgent `~/Library/LaunchAgents/com.deskpilot.cloudflared.plist`（`RunAtLoad`＋`KeepAlive`），log 在 `~/Library/Logs/deskpilot-cloudflared.log`，看到 4 條 `Registered tunnel connection` 就是連上了。重啟：`launchctl kickstart -k gui/$(id -u)/com.deskpilot.cloudflared`。
+- 不必動手機就能測整條路徑：用 WebSocket 用戶端連 `wss://<網域>` 送一則配對模式交握，收到 `handshakeAck`（0x87）即通（Mac 上可能閃一下配對視窗）。跟 WireGuard 不同，**可以在本機測外網路徑**。
+- 手機「在外面」直接輸入網域（不用開 WireGuard App）。
+- 這是開發者自己用的做法；要給其他用戶用，得把建立 Tunnel 與啟動 cloudflared 做進 App（填 Tunnel Token），尚未實作。
+
+## 外網連線：WireGuard 備援（內建於 Mac App）
 
 機制、安全模型與雷見 `modules/external-access.md`。維運上要知道的：
 

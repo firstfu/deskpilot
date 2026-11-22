@@ -4,7 +4,21 @@
 >
 > 來源索引：根 `CLAUDE.md` 文件索引表。本檔是外網機制的單一事實源；協定細節見 `protocol.md`，主機本體見 `host.md`，建置與裝機見 `../operations.md`。
 
-## 模組定位
+## 主路徑：Cloudflare Tunnel（2026-11-20 起）
+
+```
+手機 DeskPilot（wss://<網域>，WebSocket 二進位訊息）⇄ Cloudflare 邊緣 ⇄ Mac 的 cloudflared（主動外連）
+  → ingress `tcp://127.0.0.1:52830` 把 WebSocket 還原成 TCP 位元組流 → 主機本體（協定、配對加密都不變）
+```
+
+- **為什麼換成 Tunnel**：WireGuard 路徑要路由器開埠（UPnP 對映會掉）、QR 裡記公網 IP（固定網域從沒設定過，IP 一變就失效）、手機要另裝 WireGuard App；這幾個雷反覆造成「從外面又連不進來」。Tunnel 由 Mac 主動外連，三者都不需要。
+- **為什麼要包 WebSocket**：iPhone 跑不了 `cloudflared`，Cloudflare 邊緣只收 HTTPS／WebSocket。cloudflared 的 `tcp://` 入口本來就是「用戶端 WebSocket ⇄ 源站 TCP」，所以**只有手機端加 WebSocket 傳輸，主機完全不用改**（2026-11-20 用 Python 與 Swift 版用戶端從外部測到主機回 `handshakeAck` 證實）。
+- 手機端：`FramedConnection.webSocketParameters()`（TLS＋`NWProtocolWebSocket`），每個訊息框送成一則二進位訊息；收的那端把資料當位元組流重新切框（`receiveStream`／`drainBuffer`），**不能假設一則 WebSocket 訊息＝一個訊息框**，cloudflared 轉 TCP 時不保留邊界。手動輸入純 IP 仍走 TCP 52830（WireGuard 用），其他字串視為網域、走 `wss://`。
+- Mac 端設定（不在 repo、也不在 App 內）：見 `../operations.md`「Cloudflare Tunnel」。
+- **安全性與 WireGuard 不同**：經 Tunnel 的連線在主機看來來自 `127.0.0.1`，等於**主機協定直接暴露在公網**，任何人知道網域就能發起交握。保護全靠協定本身的配對加密：陌生手機只能發起配對，要有人在 Mac 上核對 6 位數並按允許；驗證模式要第一則加密訊息解得開才算通過。副作用是陌生人能讓 Mac 跳出配對視窗。之後可考慮加 Cloudflare Access（Service Token 標頭）擋在邊緣。
+- 尚未驗證：手機實機經行動網路走 Tunnel 的畫面延遲與流量；Cloudflare 對經 Tunnel 長時間串流影像的用量限制。
+
+## 模組定位（WireGuard 備援路徑）
 
 讓手機在外面（行動網路）連回這台 Mac，全部內建在 Mac App 裡，不需要手動設定 WireGuard、LaunchDaemon 或路由器。**Mac 端全自動，手機端是一次性掃 QR code 匯入官方 WireGuard App**（手機端沒有內建通道，原因見下方決策）。
 
@@ -75,6 +89,12 @@ Homebrew 版 `wireguard-go` 的 utun 介面，Network.framework 看不到、`NWL
 
 ### zsh 的 `log` 要用 `/usr/bin/log`
 查主機 log 時，zsh 的內建 `log` 會蓋掉系統指令，報 `too many arguments`。用 `/usr/bin/log show --last 10m --info --debug --predicate 'subsystem == "tw.firstfu.DeskPilotHost"' --style compact`。
+
+### 剛建好的 Tunnel 網域，本機一時解析不到
+建 DNS 記錄前查過一次（NXDOMAIN）的話，Mac 的系統 DNS 快取會記住「不存在」，`getaddrinfo` 回 `nodename nor servname provided`，但 `dig @1.1.1.1` 已有記錄。等快取過期或 `sudo dscacheutil -flushcache` 即可，不是 Tunnel 壞了。
+
+### 主機回 `authFailed` 後立刻斷線，回覆可能送不到用戶端
+2026-11-20 經 Tunnel 測 resume 交握：主機 log 有「回 authFailed」，但用戶端只收到連線關閉、沒收到 0x88。研判是主機送完就 `cancel()` 連線，資料還沒送出就被丟掉；這跟 Tunnel 無關，區網理論上也會發生。影響是手機收不到 `authFailed` 就不會設 `forcePairNext`。**未修、未在區網確認。**
 
 ### 外網開關的勾選不更新
 見 `host.md`「`@Observable` 不追蹤 `UserDefaults`」。

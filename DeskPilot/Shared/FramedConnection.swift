@@ -36,9 +36,17 @@ final class FramedConnection: @unchecked Sendable {
     /// 連線狀態改變時呼叫（在 `queue` 上）。
     var onStateChange: ((NWConnection.State) -> Void)?
 
+    /// 走 WebSocket（Cloudflare Tunnel）時，每個協定訊息框包成一則 WebSocket 二進位訊息送出；
+    /// 收的一端把收到的資料當位元組流重新切框（cloudflared 轉成 TCP 後不保留訊息邊界）。
+    let isWebSocket: Bool
+    /// WebSocket 模式下尚未切完的資料。只在 `queue` 上存取。
+    private var receiveBuffer = Data()
+
     init(connection: NWConnection, queue: DispatchQueue) {
         self.connection = connection
         self.queue = queue
+        isWebSocket = connection.parameters.defaultProtocolStack.applicationProtocols
+            .contains { $0 is NWProtocolWebSocket.Options }
     }
 
     /// 兩端共用的 TCP 參數。
@@ -53,12 +61,28 @@ final class FramedConnection: @unchecked Sendable {
         return params
     }
 
+    /// 經 Cloudflare Tunnel 連線用的 WebSocket（TLS）參數。主機端由 cloudflared 的 `tcp://` 入口
+    /// 把 WebSocket 還原成到 52830 的 TCP，所以主機不需要認得 WebSocket。
+    static func webSocketParameters() -> NWParameters {
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        tcp.enableKeepalive = true
+        tcp.keepaliveIdle = 5
+        let params = NWParameters(tls: NWProtocolTLS.Options(), tcp: tcp)
+        let ws = NWProtocolWebSocket.Options()
+        ws.autoReplyPing = true
+        ws.maximumMessageSize = ProtocolConstants.maxPayload + ProtocolConstants.headerSize
+        params.defaultProtocolStack.applicationProtocols.insert(ws, at: 0)
+        params.serviceClass = .interactiveVideo
+        return params
+    }
+
     func start() {
         connection.stateUpdateHandler = { [weak self] state in
             self?.onStateChange?(state)
         }
         connection.start(queue: queue)
-        receiveHeader()
+        if isWebSocket { receiveStream() } else { receiveHeader() }
     }
 
     func cancel() {
@@ -79,7 +103,7 @@ final class FramedConnection: @unchecked Sendable {
         sendLock.withLock {
             guard let frame = sealedFrame(type, payload) else { return }
             stats.withLock { $0.bytesSent += UInt64(frame.count) }
-            connection.send(content: frame, completion: .contentProcessed { _ in })
+            connection.send(content: frame, contentContext: sendContext, completion: .contentProcessed { _ in })
         }
     }
 
@@ -93,10 +117,17 @@ final class FramedConnection: @unchecked Sendable {
                 $0.bytesSent += UInt64(frame.count)
                 $0.videoFramesInFlight += 1
             }
-            connection.send(content: frame, completion: .contentProcessed { [weak self] _ in
+            connection.send(content: frame, contentContext: sendContext, completion: .contentProcessed { [weak self] _ in
                 self?.stats.withLock { $0.videoFramesInFlight -= 1 }
             })
         }
+    }
+
+    /// TCP 用預設內容；WebSocket 每則訊息標成二進位。
+    private var sendContext: NWConnection.ContentContext {
+        guard isWebSocket else { return .defaultMessage }
+        return NWConnection.ContentContext(identifier: "frame",
+                                           metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)])
     }
 
     /// 已加密時把 type 包進密文、外層一律標 `.encrypted`。呼叫端需持有 `sendLock`。
@@ -155,6 +186,44 @@ final class FramedConnection: @unchecked Sendable {
             self.deliver(rawType, data)
             self.receiveHeader()
         }
+    }
+
+    /// WebSocket 模式：有多少收多少，累積到緩衝區再切出完整訊息框。
+    private func receiveStream() {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+            if let data, !data.isEmpty {
+                self.receiveBuffer.append(data)
+                self.stats.withLock { $0.bytesReceived += UInt64(data.count) }
+                guard self.drainBuffer() else { return }
+            }
+            if error != nil || (isComplete && (data?.isEmpty ?? true)) {
+                Self.log.notice("對方關閉連線（error: \(String(describing: error), privacy: .public)）")
+                self.connection.cancel()
+                return
+            }
+            self.receiveStream()
+        }
+    }
+
+    /// 從緩衝區切出所有完整的訊息框並交付。協定錯誤時斷線並回傳 false。
+    private func drainBuffer() -> Bool {
+        let header = ProtocolConstants.headerSize
+        while receiveBuffer.count >= header {
+            let base = receiveBuffer.startIndex
+            let rawType = receiveBuffer[base]
+            let length = receiveBuffer[(base + 1)..<(base + header)].reduce(0) { $0 << 8 | Int($1) }
+            guard length <= ProtocolConstants.maxPayload else {
+                connection.cancel()
+                return false
+            }
+            guard receiveBuffer.count >= header + length else { break }
+            let payload = Data(receiveBuffer[(base + header)..<(base + header + length)])
+            receiveBuffer = Data(receiveBuffer[(base + header + length)...])
+            deliver(rawType, payload)
+            if connection.state == .cancelled { return false }
+        }
+        return true
     }
 
     private func deliver(_ rawType: UInt8, _ payload: Data) {

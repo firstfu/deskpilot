@@ -6,7 +6,7 @@
 
 ## 模組定位
 
-`DeskPilot/Shared/` 是一個 Xcode synchronized folder，同時加進 iOS 與 macOS 兩個 target 的 `fileSystemSynchronizedGroups`（Xcode MCP 沒有設定 target membership 的工具，當初是手改 pbxproj 加的）。目前全部走一條 TCP 連線（`noDelay`、`serviceClass = .interactiveVideo`），Bonjour 服務類型 `_deskpilot._tcp`，主機固定監聽 **TCP 52830**（`ProtocolConstants.port`，外網手動輸入 IP 時要用），Bonjour TXT 帶 `id`＝主機 ID。
+`DeskPilot/Shared/` 是一個 Xcode synchronized folder，同時加進 iOS 與 macOS 兩個 target 的 `fileSystemSynchronizedGroups`（Xcode MCP 沒有設定 target membership 的工具，當初是手改 pbxproj 加的）。目前全部走一條 TCP 連線（`noDelay`、`serviceClass = .interactiveVideo`），外網經 Cloudflare Tunnel 時手機端改走 WebSocket（TLS），訊息框格式不變、由 cloudflared 在 Mac 端還原成同一條 TCP（見 `external-access.md`「主路徑」）。Bonjour 服務類型 `_deskpilot._tcp`，主機固定監聽 **TCP 52830**（`ProtocolConstants.port`，外網手動輸入 IP 時要用），Bonjour TXT 帶 `id`＝主機 ID。
 
 ## 訊息框與編碼規則
 

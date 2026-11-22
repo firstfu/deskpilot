@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-20 — 外網改走 Cloudflare Tunnel（WebSocket 傳輸），WireGuard 留作備援（未 commit）
+
+- **變更**：`FramedConnection` 加 WebSocket 模式（`webSocketParameters()`、二進位訊息送框、收端當位元組流重新切框）；手機「在外面」輸入框：純 IP 走 TCP、網域走 `wss://`。主機程式碼沒改。Mac 上建了 `deskpilot` Tunnel（ingress `tcp://127.0.0.1:52830`）與 DNS 記錄，cloudflared 以使用者 LaunchAgent 常駐（repo 外）。文件：`external-access.md` 新增「主路徑」、`operations.md` 新增 Tunnel 維運、`client.md`／`protocol.md`／`overview.md` 補說明。
+- **為什麼**：使用者回報「從外面又連不進來」。查 Mac 端：helper、`wireguard-go`、utun 全正常，但固定網域從沒設定過，QR 記的是裸公網 IP，加上 UPnP 對映會掉，WireGuard 路徑反覆失效。使用者要求改用 Cloudflare Tunnel；iPhone 跑不了 cloudflared，所以手機端包 WebSocket，cloudflared 的 `tcp://` 入口剛好把它還原成主機原本的 TCP。
+- **驗證**：iOS 與 Mac target build 成功；Python 與 Swift（直接編 `Shared/`）WebSocket 用戶端從外部經 Tunnel 收到主機 `handshakeAck`。**手機實機尚未安裝**（`devicectl` 回 4016，手機鎖定或不在同一 Wi-Fi）。
+- **下一步**：裝到 iPhone 15 Plus，行動網路下輸入網域實測畫面與延遲；修「`authFailed` 送完就斷線、回覆送不到」；評估加 Cloudflare Access 擋陌生交握；要給別人用時把 Tunnel Token 設定做進 App。
+
 ### 2026-11-15 — 加上 App 圖示（`7468804`）
 
 - **變更**：新增 `scripts/make-app-icons.sh`（SVG 寫在腳本裡，用 `rsvg-convert` 輸出），產生 iOS 滿版 1024 圖示與 Mac 主機 16～1024 各尺寸（824 圓角方形加陰影）；兩個 `AppIcon.appiconset` 的 `Contents.json` 改成只列實際有圖的欄位。圖案是深藍底、漸層螢幕色塊加白色游標，兩端共用。

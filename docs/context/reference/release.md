@@ -2,7 +2,7 @@
 
 > **何時讀**：要發新版 Mac 主機給別人用、評估「用戶下載後能不能直接用」、或動簽章／helper 驗證邏輯前。
 >
-> 範圍只談 Mac 主機；iPhone 端的發布不在此討論範圍。來源索引：根 `CLAUDE.md` 文件索引表。建置見 `operations.md`，helper 安全模型見 `modules/external-access.md`。
+> 範圍主要談 Mac 主機；iPhone 端只記下方「iPhone 端：免費帳號裝不到遠端」這條限制。來源索引：根 `CLAUDE.md` 文件索引表。建置見 `operations.md`，helper 安全模型見 `modules/external-access.md`。
 
 ## 結論（2026-10-28）
 
@@ -24,6 +24,10 @@
 ## 公網 IP 會變：固定網域
 
 已內建 Cloudflare DDNS（用戶自備網域與 API Token，見 `modules/external-access.md`），尚未實測。沒設定時 QR 記的是當下 IP，IP 一變手機就斷，對外網版不實用，所以外網開放前要先實測通過。
+
+## iPhone 端：免費帳號裝不到遠端
+
+免費開發者帳號沒有 TestFlight，也不能做 ad hoc／下載連結安裝；新版只能由 Mac 用 `devicectl` 推到手機，手機必須跟 Mac 同一個 Wi-Fi 或接線（不可達時回 `error 4016`）。**人在外面時裝不到新版**，只能用手機上已裝的舊版。要遠端分發得升級付費帳號（US$99／年）走 TestFlight。2026-11-20 改完 Tunnel 版手機端時就卡在這裡。
 
 ## 用戶仍須手動做的事
 
