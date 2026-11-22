@@ -2,7 +2,7 @@
 //  DeskPilotHostApp.swift
 //  DeskPilotHost
 //
-//  macOS 主機端入口：選單列 App（沒有 Dock 圖示），讓手機透過區網或通道控制這台電腦。
+//  macOS 主機端入口：選單列 App（沒有 Dock 圖示），讓手機透過區網或 Cloudflare Tunnel 控制這台電腦。
 //  主視窗平常不開；缺權限、有配對請求時才自動跳出來。
 //
 
@@ -13,30 +13,16 @@ import SwiftUI
 @main
 struct DeskPilotHostApp: App {
     @State private var controller = HostController()
-    @State private var external = ExternalAccessController()
-    @State private var helper = HelperClient()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(controller: controller, external: external, helper: helper)
+            MenuContent(controller: controller)
         } label: {
-            MenuBarIcon(controller: controller, external: external, helper: helper)
+            MenuBarIcon(controller: controller)
         }
 
         Window("DeskPilot 主機", id: "main") {
             ContentView(controller: controller)
-        }
-        .windowResizability(.contentSize)
-        .defaultLaunchBehavior(.suppressed)
-
-        Window("固定網域", id: "ddns") {
-            DDNSSettingsView(external: external)
-        }
-        .windowResizability(.contentSize)
-        .defaultLaunchBehavior(.suppressed)
-
-        Window("配對手機", id: "pair") {
-            PairingView(helper: helper, external: external)
         }
         .windowResizability(.contentSize)
         .defaultLaunchBehavior(.suppressed)
@@ -46,17 +32,12 @@ struct DeskPilotHostApp: App {
 /// 選單列圖示。它在 App 啟動時就會建立，所以順便負責啟動主機與「該不該把視窗叫出來」。
 private struct MenuBarIcon: View {
     let controller: HostController
-    let external: ExternalAccessController
-    let helper: HelperClient
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Image(systemName: symbol)
             .task {
                 controller.start()
-                await helper.refresh()
-                external.helper = helper
-                external.start()
                 // 缺權限（通常是第一次使用）或指定要看視窗（量測用）時，啟動就打開主視窗
                 if !controller.permissionsOK || ProcessInfo.processInfo.environment["DESKPILOT_SHOW_WINDOW"] != nil {
                     showWindow()
@@ -82,8 +63,6 @@ private struct MenuBarIcon: View {
 
 private struct MenuContent: View {
     let controller: HostController
-    let external: ExternalAccessController
-    let helper: HelperClient
     @Environment(\.openWindow) private var openWindow
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -106,18 +85,6 @@ private struct MenuContent: View {
                     launchAtLogin = SMAppService.mainApp.status == .enabled
                 }
             }
-        Toggle("外網連線（自動開埠）", isOn: Binding(get: { external.isEnabled }, set: { external.setEnabled($0) }))
-        if external.isEnabled { Text(externalText) }
-        if external.publicIPChanged {
-            Button("公網位址已變更，手機需更新（按此確認）") { external.acknowledgeIPChange() }
-        }
-        if external.isEnabled {
-            Button(external.ddnsHostname.isEmpty ? "設定固定網域（Cloudflare）…" : "固定網域：\(external.ddnsHostname)…") {
-                openWindow(id: "ddns")
-                NSApp.activate()
-            }
-        }
-        helperItems
         Divider()
         Button("結束 DeskPilot") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
@@ -128,38 +95,6 @@ private struct MenuContent: View {
         case .idle: "啟動中…"
         case .listening: "等待手機連線"
         case .connected(let name): "已連線：\(name)"
-        case .failed(let msg): "錯誤：\(msg)"
-        }
-    }
-
-    @ViewBuilder private var helperItems: some View {
-        switch helper.status {
-        case .notRegistered:
-            Button("安裝外網通道元件…") { Task { await helper.install() } }
-        case .requiresApproval:
-            Button("到系統設定核准通道元件…") { helper.openApprovalSettings() }
-        case .ready(let v):
-            Text("通道元件已就緒（v\(v)）")
-            Button("配對手機（外網）…") {
-                openWindow(id: "pair")
-                NSApp.activate()
-            }
-            .disabled(!external.isEnabled)
-            Button("重新安裝通道元件（App 搬位置後用）") { Task { await helper.reinstall() } }
-        case .failed(let msg):
-            Text("通道元件錯誤：\(msg)")
-            Button("重新安裝通道元件") { Task { await helper.install() } }
-        }
-    }
-
-    private var externalText: String {
-        switch external.state {
-        case .off: "已關閉"
-        case .checking: "檢查中…"
-        case .ready(let ip, let method): "可從外網連入：\(ip)（\(method?.rawValue ?? "手動")）"
-        case .needsManualForward(let ip): "請在路由器手動轉發 UDP \(ExternalAccessController.listenPort)（公網 \(ip)）"
-        case .blockedByNAT: "你的網路沒有公網 IP（營運商或上層路由器有 NAT），外網直連不可用"
-        case .offline: "無法連到網際網路"
         case .failed(let msg): "錯誤：\(msg)"
         }
     }

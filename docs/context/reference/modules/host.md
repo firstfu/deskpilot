@@ -14,7 +14,6 @@ macOS App，非沙箱（`ENABLE_APP_SANDBOX = NO`，CGEvent 注入需要）。�
 - 主視窗自動跳出的時機：缺任一權限、手機要求配對（要看確認碼）、環境變數 `DESKPILOT_SHOW_WINDOW` 有設（量測用，`host-bench.sh start` 已帶，探針標記在視窗上要看得到）。
 - 權限清單每秒輪詢更新，使用者在系統設定打開開關後視窗自動打勾。螢幕錄製在授權後**要重開 App 才生效**（`needsRelaunch`＝啟動時沒權限、現在有），視窗提供「立即重新啟動」：交給 shell 延遲 1 秒再 `open -n`，讓舊程序先放掉監聽埠。
 - 選單有「開機時自動啟動」（`SMAppService.mainApp`，預設關）。
-- 選單也有外網相關項目（自動開埠開關、通道元件安裝、配對手機）：整套機制見 `external-access.md`。
 
 ## 擷取與編碼的關鍵設計
 
@@ -69,14 +68,11 @@ log 會出現 `編碼器不支援 MaxFrameDelayCount（-12900）`、`PrioritizeE
 ### 捲動事件送到了但畫面不動
 游標停在網頁的內嵌媒體區（影片／iframe）時，捲動被那個元件吃掉。log 的 `scrolls=` 計數會增加但流量不變。量測時要把游標放在正文上。
 
-### 從 WireGuard 通道連不進來（Network.framework 看不到 utun）
-Homebrew 版 `wireguard-go` 建的 utun 介面不會登記到系統網路設定，`NWPathMonitor` 的可用介面清單裡沒有它，`NWListener` 也不會在上面收連線（手機表現為「連線中斷」，主機 log 完全沒有連線紀錄）。**做法**：`TunnelRelay` 用 BSD socket 監聽 utun 上的 IPv4 位址（每 10 秒重掃），收到後轉到 `127.0.0.1:52830`。兩個雷：①必須等主監聽器 `.ready` 後才開轉接，否則轉接先綁特定位址，主監聽器綁萬用位址會 `Address already in use`；②`accept` 出來的 socket 會繼承監聽 socket 的 `O_NONBLOCK`，要清掉，否則阻塞式轉送迴圈第一次讀不到就當成對方關閉、把兩端一起切斷（兩端 log 都說「對方關閉連線」）。
-
 ### 重 build 主機後被防火牆擋
-macOS 防火牆開啟時，重新 build 的 DeskPilotHost 可能被改成「阻擋連入」，區網與通道都連不上。用 `socketfilterfw --listapps` 檢查，`sudo socketfilterfw --unblockapp <App 路徑>` 放行。
+macOS 防火牆開啟時，重新 build 的 DeskPilotHost 可能被改成「阻擋連入」，區網連不上（cloudflared 走本機回送位址，不受影響）。用 `socketfilterfw --listapps` 檢查，`sudo socketfilterfw --unblockapp <App 路徑>` 放行。
 
 ### 選單的勾選不更新（`@Observable` 不追蹤 `UserDefaults`）
-選單的 Toggle 若用 `UserDefaults.standard.bool(...)` 當 getter，SwiftUI 不會追蹤它的變化，點了之後畫面不打勾；使用者以為沒生效又點一次，反而把它關掉。**實際上**設定已寫入。做法：開關狀態存在 `@Observable` 類別的儲存屬性（`ExternalAccessController.isEnabled`），再同步寫進 `UserDefaults`。
+選單的 Toggle 若用 `UserDefaults.standard.bool(...)` 當 getter，SwiftUI 不會追蹤它的變化，點了之後畫面不打勾；使用者以為沒生效又點一次，反而把它關掉。**實際上**設定已寫入。做法：開關狀態存在 `@Observable` 類別的儲存屬性（例如已移除的外網開關 `ExternalAccessController.isEnabled`；現存的「開機時自動啟動」改讀 `SMAppService.mainApp.status`），再同步寫進 `UserDefaults`。
 
 ### 連線來源限制
 主機只接受私有網段（10/8、172.16/12、192.168/16、127/8、169.254/16、IPv6 link-local／ULA）的連線；新連線最多 4 條未驗證、交握 10 秒逾時、配對請求 60 秒沒回應視同拒絕。

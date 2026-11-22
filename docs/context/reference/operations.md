@@ -8,8 +8,7 @@
 
 - 專案：`DeskPilot/DeskPilot.xcodeproj`，scheme `DeskPilot`（iOS）與 `DeskPilotHost`（macOS）。
 - **Xcode MCP 對這個專案不可用**（2026-10-27）：它回報 workspace 沒有 scheme、也列不出 target template，無法 build 或新增 target。改用 `xcodebuild -project … -scheme … build`；新增 target／build phase 用 `xcodeproj` gem 寫腳本改（專案格式版本 110 比 gem 支援的新，改之前先備份 `project.pbxproj`，並確認讀寫一輪只多空陣列與註解差異）。
-- **第一次 build 主機前**要先跑 `scripts/build-wireguard-go.sh`（`wireguard-go` 二進位檔不進 repo，見 `modules/external-access.md`）。
-- **build 產物不要放 `/private/tmp` 這類暫存路徑**：Launch Services 不認得，螢幕錄製權限會不生效、`tccutil reset` 回 -10814、helper 的註冊路徑也會在重開機後消失。用 Xcode 預設的 DerivedData（下一條）。
+- **build 產物不要放 `/private/tmp` 這類暫存路徑**：Launch Services 不認得，螢幕錄製權限會不生效、`tccutil reset` 回 -10814。用 Xcode 預設的 DerivedData（下一條）。
 - 開發簽章 Team：見 Xcode 專案的 Signing 設定。
 - 主機 build 產物：`~/Library/Developer/Xcode/DerivedData/DeskPilot-falljhyhqgfaxvektnwjdczkiuli/Build/Products/Debug/DeskPilotHost.app`。
 
@@ -42,19 +41,9 @@
 
 - `cloudflared`（Homebrew）＋已登入的 `~/.cloudflared/cert.pem`；Tunnel 名稱 `deskpilot`，設定檔 `~/.cloudflared/deskpilot.yml`（ingress：網域 → `tcp://127.0.0.1:52830`），憑證 `~/.cloudflared/<tunnel-id>.json`（勿外洩、勿進 repo）。
 - 常駐：使用者層 LaunchAgent `~/Library/LaunchAgents/com.deskpilot.cloudflared.plist`（`RunAtLoad`＋`KeepAlive`），log 在 `~/Library/Logs/deskpilot-cloudflared.log`，看到 4 條 `Registered tunnel connection` 就是連上了。重啟：`launchctl kickstart -k gui/$(id -u)/com.deskpilot.cloudflared`。
-- 不必動手機就能測整條路徑：用 WebSocket 用戶端連 `wss://<網域>` 送一則配對模式交握，收到 `handshakeAck`（0x87）即通（Mac 上可能閃一下配對視窗）。跟 WireGuard 不同，**可以在本機測外網路徑**。
-- 手機「在外面」直接輸入網域（不用開 WireGuard App）。
+- 不必動手機就能測整條路徑：用 WebSocket 用戶端連 `wss://<網域>` 送一則配對模式交握，收到 `handshakeAck`（0x87）即通。經 Tunnel 的配對請求會被擋（回 `pairResult`=2），不會跳視窗；**可以在本機測外網路徑**。
+- 手機「在外面」直接輸入網域；手機上的其他 VPN 要關掉（見 `modules/external-access.md`）。
 - 這是開發者自己用的做法；要給其他用戶用，得把建立 Tunnel 與啟動 cloudflared 做進 App（填 Tunnel Token），尚未實作。
-
-## 外網連線：WireGuard 備援（內建於 Mac App）
-
-機制、安全模型與雷見 `modules/external-access.md`。維運上要知道的：
-
-- 使用者在選單列打開「外網連線（自動開埠）」＋「安裝外網通道元件…」（要到系統設定「登入項目」核准一次）＋「配對手機（外網）…」顯示 QR code，用手機官方 WireGuard App 掃描；手機關 Wi-Fi、開通道、DeskPilot「在外面」輸入 `10.66.0.1`。**首次配對要人在 Mac 旁邊**（Mac 上要核對 6 位數並按允許，也可以直接在通道上配對；或先在區網配對一次）。
-- 不再需要手動的 `/etc/wireguard`、LaunchDaemon、`upnp-map.py`、DDNS 腳本。這些在 2026-10-27 查證時，這台 Mac 上已不存在。
-- 看通道狀態：helper 的 `tunnelStatus`（要簽章相符的呼叫端）；不需要 root 的方法是 `netstat -I utun<N> -b`（`Ipkts` 是從手機收到的封包，0 代表手機還沒送到）與 `ifconfig`（看有沒有 `10.66.0.1`）。看 `wg show` 之類需要 root。外網連不上時的排查順序見 `modules/external-access.md`「Mac 端全正常、手機就是連不上」。
-- Mac 連自己的通道位址會繞進 WireGuard，**無法在本機測外網路徑**，只能用手機行動網路實測。
-- 換 helper 版本要 `sudo launchctl kickstart -k system/tw.firstfu.DeskPilotHost.helper`；App 搬位置要選單「重新安裝通道元件」。
 
 ## 權限（只能使用者手動開）
 

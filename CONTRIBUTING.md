@@ -7,7 +7,7 @@ DeskPilot is built by one person, so every bit of help is noticed. Issues and pu
 Please include:
 
 - macOS and iOS versions
-- LAN or remote access (WireGuard tunnel)
+- LAN or remote access (Cloudflare Tunnel)
 - What you expected and what happened — a screenshot helps
 - Whether Screen & System Audio Recording and Accessibility are granted to the host app
 

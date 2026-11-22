@@ -61,26 +61,24 @@
 | 項目 | 狀態 |
 |---|---|
 | 區網（LAN）連線 | 已在實機測試 |
-| 外網（行動網路 → 通道 → Mac） | **端到端尚待實測** |
+| 外網（行動網路 → Cloudflare Tunnel → Mac） | 已在實機測通；長時間穩定度尚未量測 |
 | 公證版本／App Store／TestFlight | 無 |
 
 文件中的數字（例如捲動約 1 Mbps）來自模擬器量測與 App 內建量測，不是受控實驗室的結果。
 
 ## 從原始碼建置
 
-需要 Mac 與 iPhone（符合專案部署目標：macOS 27、iOS 27）、對應版本的 Xcode，以及一個 Apple ID。免費 Apple ID 即可 build，但**免費帳號簽的 App 約 7 天後過期**，需重新安裝。只有外網功能才需要 Go。
+需要 Mac 與 iPhone（符合專案部署目標：macOS 27、iOS 27）、對應版本的 Xcode，以及一個 Apple ID。免費 Apple ID 即可 build，但**免費帳號簽的 App 約 7 天後過期**，需重新安裝。
 
 ```sh
 git clone https://github.com/firstfu/deskpilot.git && cd deskpilot
-scripts/build-wireguard-go.sh   # 只有要用外網功能時
 open DeskPilot/DeskPilot.xcodeproj
 ```
 
 1. 在 Xcode 的每個 target 的 Signing 選你自己的 Team，必要時改掉 bundle identifier（`tw.firstfu.*`）。
-2. 把 [`DeskPilot/Shared/HelperProtocol.swift`](../DeskPilot/Shared/HelperProtocol.swift) 的 `teamID` 改成你的 Team ID。特權 helper 只接受同 Team 簽出的主機 App，沒改的話外網通道連不上 helper。
-3. 建置 Mac 的 **DeskPilotHost** 與 iPhone 的 **DeskPilot**。
+2. 建置 Mac 的 **DeskPilotHost** 與 iPhone 的 **DeskPilot**。
    Mac 的 build 產物請放在 Xcode 預設的 DerivedData，不要放 `/private/tmp` 之類的暫存路徑，否則螢幕錄製權限不會生效。
-4. 在 Mac 的「系統設定 › 隱私權與安全性」授予**螢幕與系統錄音**與**輔助使用**，改完要重開主機 App。
+3. 在 Mac 的「系統設定 › 隱私權與安全性」授予**螢幕與系統錄音**與**輔助使用**，改完要重開主機 App。
 
 ### 區網連線
 
@@ -89,24 +87,22 @@ open DeskPilot/DeskPilot.xcodeproj
 
 ## 外網連線（選用）
 
-在外面時，DeskPilot 經 WireGuard 通道連回家，Mac 當伺服器，全部內建於 Mac App：
+在外面時，DeskPilot 經 [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) 連回家。Mac 上跑 `cloudflared`，由 Mac 主動連到 Cloudflare 並保持連線，所以路由器不用開埠，公網 IP 變了也沒關係，手機也不用裝 VPN App。
 
-1. 在選單列開啟「外網連線（自動開埠）」。路由器需支援 NAT-PMP 或 UPnP，否則要自己轉發 UDP 51820。
-2. 點「安裝外網通道元件…」，到「系統設定 › 登入項目」核准一次。
-3. 點「配對手機（外網）…」顯示 QR code，用 iPhone 上的**官方 WireGuard App** 掃描匯入。
-4. 手機關掉 Wi-Fi、開啟通道，DeskPilot 選「在外面」並輸入 `10.66.0.1`。
+1. 用你自己的 Cloudflare 帳號與網域建一條 Tunnel，ingress 把網域（例如 `deskpilot.example.com`）對到 `tcp://127.0.0.1:52830`，並讓 Mac 上的 `cloudflared` 常駐。
+2. **手機先在同一個 Wi-Fi 下配對一次。** 經 Tunnel 不能做首次配對。
+3. 手機的 DeskPilot 選「在外面」並輸入網域。手機上其他 VPN 要關掉。
 
-首次配對請人在 Mac 旁邊。QR code 內的位址是當下的公網 IP，IP 變動後要重新產生。若路由器之後還有一層 NAT（例如營運商 CGNAT），無法直連。
+Tunnel 設定目前還沒做進 App，做法見[維運文件](../docs/context/reference/operations.md)。
 
 ## 安全模型
 
-- 所有連線加密且需配對（見[協定說明](../docs/context/reference/modules/protocol.md)）。
-- 外網通道只開放給 WireGuard，主機只接受私有網段來源，DeskPilot 本身不直接暴露在公網。
-- 特權 helper 以 root 執行，但只開放固定方法，不接收路徑、指令字串或設定檔；呼叫者以程式碼簽章驗證。手機私鑰只存在 QR code 裡，Mac 不保存。
-- 每次連線前需要 Face ID（或手機密碼），手機遺失時撿到的人拿不到 Mac 控制權。
+- 所有連線端到端加密且需配對。Cloudflare 會解開 TLS，但看到的只有密文（見[協定說明](../docs/context/reference/modules/protocol.md)）。
+- 知道網域的人都能經 Tunnel 連到主機，所以主機**拒絕經 Tunnel 的首次配對**：只有已在區網配對過的手機能從外面連，陌生人也沒辦法讓你的 Mac 跳出配對視窗。
+- 每次連線前需要 Face ID（或手機密碼）；手機遺失時可在 Mac 的已配對裝置清單移除它。
 
 > [!WARNING]
-> 免費的 Apple Development 憑證不經 Apple 公證，簽章驗證的保護力弱於 Developer ID，目前只適合自用。
+> 免費的 Apple Development 憑證不經 Apple 公證，目前只適合自用。
 
 ## 常見問題
 
@@ -131,7 +127,7 @@ open DeskPilot/DeskPilot.xcodeproj
 <details>
 <summary><b>外網連不上</b></summary>
 
-確認路由器支援 NAT-PMP 或 UPnP（或自己轉發 UDP 51820）、不在 CGNAT 後面、QR code 是用當下的公網 IP 產生的。另外這條路徑還沒做過端到端驗證。
+確認 Mac 上的 `cloudflared` 有在跑且 Tunnel 已連上、主機 App 有開、手機沒有開其他 VPN。若手機顯示「外網不能做首次配對」，先在同一個 Wi-Fi 下配對一次。
 </details>
 
 ## 專案結構
@@ -139,18 +135,13 @@ open DeskPilot/DeskPilot.xcodeproj
 | 位置 | 內容 |
 |---|---|
 | `DeskPilot/DeskPilot/` | iPhone 端：顯示、手勢、中文輸入 |
-| `DeskPilot/DeskPilotHost/` | Mac 主機：螢幕擷取、編碼、輸入注入、外網控制 |
-| `DeskPilot/DeskPilotHelper/` | 特權 helper（root LaunchDaemon），啟停 WireGuard |
+| `DeskPilot/DeskPilotHost/` | Mac 主機：螢幕擷取、編碼、輸入注入 |
 | `DeskPilot/Shared/` | 兩端共用的協定與加密 |
 | `docs/context/` | 架構、協定、維運與踩雷紀錄，從 [`overview.md`](../docs/context/reference/overview.md) 開始讀 |
 
 ## 參與貢獻
 
 一個人開發，歡迎 issue 與 pull request，見 [CONTRIBUTING.md](../CONTRIBUTING.md)。最有用的回報會附上 macOS 與 iOS 版本、走區網還是外網，以及畫面上看到什麼。
-
-## 第三方元件
-
-外網通道使用 [wireguard-go](https://git.zx2c4.com/wireguard-go)（MIT），由釘死版本的上游原始碼編譯。為避免 GPL 義務，刻意不打包 `wireguard-tools`。
 
 ## 授權
 

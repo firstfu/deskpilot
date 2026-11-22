@@ -499,7 +499,7 @@ final class ClientLink: @unchecked Sendable {
     private func sendHandshake() {
         let priv = Curve25519.KeyAgreement.PrivateKey()
         ephemeral = priv
-        // 手動輸入 IP（WireGuard）時沒有 Bonjour 公告的主機 ID：有任何配對紀錄就走驗證，
+        // 手動輸入位址（網域或 IP）時沒有 Bonjour 公告的主機 ID：有任何配對紀錄就走驗證，
         // 交握回覆帶回主機 ID 後再找對應金鑰。配對只在區網進行，在外面也沒人能按允許
         // 上次被主機拒絕（不認得這支手機）就改走配對，否則會用舊金鑰無限重試
         let known = !Self.forcePairNext && (host.hostID.map { PairingStore.key(for: $0) != nil } ?? !PairingStore.all().isEmpty)
@@ -639,11 +639,14 @@ final class ClientLink: @unchecked Sendable {
         case .pairResult:
             guard let pending = pendingPairKey else { return }
             pendingPairKey = nil
-            if payload.first == 1 {
+            switch payload.first {
+            case PairResultCode.allowed:
                 PairingStore.save(id: pending.hostID, name: host.name, key: pending.key)
                 Self.forcePairNext = false
                 onSecured?()
-            } else {
+            case PairResultCode.remoteNotAllowed:
+                onRejected?("外網不能做首次配對，請先在同一個 Wi-Fi 下連一次這台 Mac 完成配對")
+            default:
                 onRejected?("Mac 上拒絕了配對")
             }
         case .helloAck:

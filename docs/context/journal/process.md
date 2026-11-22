@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-23 — 移除 WireGuard 備援；經 Cloudflare Tunnel 的連線不准首次配對（`待填`）
+
+- **變更**：刪掉整套 WireGuard：`DeskPilotHelper` target、`HelperSupport/`、`Shared/HelperProtocol.swift`、`DeskPilotHost/ExternalAccess/`（自動開埠、可達性、DDNS、QR 配對）、`TunnelRelay`、`scripts/build-wireguard-go.sh`、主機 Info.plist 的 ATS 例外與選單項目；pbxproj 用 xcodeproj gem 移除 target 與三個 build phase。主機新增 `HostController.allowsPairing`：來源是回送位址（cloudflared 轉進來的）就不准配對，回 `pairResult`=2（新增 `PairResultCode`）、1 秒後斷線；手機收到 2 顯示「外網不能做首次配對」，「在外面」預設位址改成空字串。文件：`external-access.md` 改寫成只有 Tunnel，並在最後留一段「已移除：WireGuard」；`overview`／`operations`／`release`／`host`／`client`／`protocol`、根 `CLAUDE.md` 索引、兩份 README、CONTRIBUTING 同步。
+- **為什麼**：使用者問 Tunnel 有沒有安全問題。Tunnel 讓主機協定直接暴露在公網，cloudflared 的連線來源是 `127.0.0.1`，原本「只接受私有網段」的檢查形同失效，任何知道網域的人都能讓 Mac 跳出配對視窗，誤按一次允許就拿到整台 Mac。使用者接著說 WireGuard 不用了、手機端已刪，要求整套從 repo 移除（留著只是多一個 root 常駐程式和路由器上的開放埠）。
+- **驗證**：Mac 與 iOS target build 成功，主機 clean build 後 App 內已沒有 helper、`wireguard-go`、LaunchDaemons；重啟主機後用 Python 用戶端測：經 `wss://` 網域與直連 `127.0.0.1` 的配對請求都收到解密後的 `pairResult`=2、沒跳視窗；區網 IP 照常等待允許。路由器上的 UDP 51820 對映已用 UPnP `DeletePortMapping` 刪掉（再查回 714）。**未驗證**：手機端新提示（新版還沒裝到手機）。
+- **下一步**：Mac 上殘留的 root helper（`tw.firstfu.DeskPilotHost.helper`、`/var/db/deskpilot/`、執行中的 `wireguard-go`）要使用者用 sudo 清；手機裝新版；評估 Cloudflare Access Service Token、交握頻率限制；修 `authFailed` 送完就斷線。
+
 ### 2026-11-23 — Cloudflare Tunnel 手機實機端到端成功（`bdf9631`）
 
 - **變更**：沒改程式碼。重開機後主機沒自動啟動，把 `DeskPilotHost.app` 加進登入項目（已記在 `operations.md`）；新版裝到 iPhone 15 Plus；`external-access.md` 新增「手機開著 WireGuard 時走 Tunnel 會連不上」。

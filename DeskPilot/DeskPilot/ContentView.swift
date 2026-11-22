@@ -30,8 +30,8 @@ struct ContentView: View {
 /// 主機清單。
 struct HostListScreen: View {
     let session: ClientSession
-    /// 上次手動輸入的位址（例如 WireGuard 通道裡的 Mac：10.66.0.1）。
-    @AppStorage("manualHostAddress") private var manualAddress = "10.66.0.1"
+    /// 上次手動輸入的位址（通常是 Cloudflare Tunnel 的網域）。
+    @AppStorage("manualHostAddress") private var manualAddress = ""
 
     /// 手動輸入轉成連線目標：純 IP 走 TCP 52830；網域（或 wss:// 網址）走 Cloudflare Tunnel 的 WebSocket。
     static func manualEndpoint(_ input: String) -> NWEndpoint? {
@@ -82,7 +82,7 @@ struct HostListScreen: View {
                 } header: {
                     Text("在外面")
                 } footer: {
-                    Text("輸入 Mac 的 Cloudflare Tunnel 網域（例如 deskpilot.example.com）直接連線；或先打開 WireGuard App，再輸入通道位址 10.66.0.1。第一次配對必須在同一個 Wi-Fi 下完成。")
+                    Text("輸入 Mac 的 Cloudflare Tunnel 網域（例如 deskpilot.example.com）直接連線。第一次配對必須在同一個 Wi-Fi 下完成。")
                 }
 
                 if case .connecting(let name) = session.state {

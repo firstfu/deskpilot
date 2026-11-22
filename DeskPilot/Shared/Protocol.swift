@@ -16,7 +16,7 @@ enum ProtocolConstants {
     static let version: UInt16 = 6
     /// Bonjour 服務類型，需與 iOS Info.plist 的 NSBonjourServices 一致。
     static let bonjourType = "_deskpilot._tcp"
-    /// 主機固定監聽的 TCP 埠。區網靠 Bonjour 找主機用不到，但從 WireGuard 通道手動輸入 IP 連線時需要固定值。
+    /// 主機固定監聽的 TCP 埠。區網靠 Bonjour 找主機用不到，但手動輸入 IP 與 cloudflared 的 ingress（`tcp://127.0.0.1:52830`）需要固定值。
     static let port: UInt16 = 52830
     /// 傳輸框標頭長度（type 1 byte + length 4 bytes）。
     static let headerSize = 5
@@ -60,7 +60,7 @@ enum MessageType: UInt8 {
     case handshakeAck = 0x87
     /// 主機不認得這支手機（明文，隨即斷線）。手機應刪掉本地配對紀錄並重新配對。
     case authFailed = 0x88
-    /// 配對結果（加密）：payload 為 UInt8，1 = 允許、0 = 拒絕。
+    /// 配對結果（加密）：payload 為 UInt8，見 `PairResultCode`（1 = 允許、0 = 拒絕、2 = 不允許從外網配對）。
     case pairResult = 0x89
     /// Mac 的剪貼簿文字（回應 `clipboard` 的空請求）：payload 為 UTF-8，可能為空。
     case hostClipboard = 0x8A
@@ -68,6 +68,14 @@ enum MessageType: UInt8 {
     case audioFormat = 0x8B
     /// 一包 AAC 聲音資料：payload 為原始 AAC 封包（單一 packet）。靜音時不送。
     case audioFrame = 0x8C
+}
+
+/// `pairResult` 的 payload。2 是後來加的：舊版手機只認 1，其他值一律當拒絕，所以不必升協定版本。
+enum PairResultCode {
+    static let rejected: UInt8 = 0
+    static let allowed: UInt8 = 1
+    /// 連線經 Cloudflare Tunnel（公網）進來，主機不接受在這裡做首次配對。
+    static let remoteNotAllowed: UInt8 = 2
 }
 
 /// 協定解析錯誤。

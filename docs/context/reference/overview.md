@@ -6,7 +6,7 @@ DeskPilot：用 iPhone 在區網（Wi-Fi）內操控 Mac 的遠端桌面 App。�
 
 - 原始碼：`~/Desktop/deskpilot`；公開 GitHub repo：https://github.com/firstfu/deskpilot（`main`）
 - 連線一律加密並需配對（協定 v4，2026-10-26）：首次在 Mac 上核對 6 位數並允許，之後以 Keychain 金鑰自動驗證；手機連線前要 Face ID。細節見 `modules/protocol.md`。
-- 區網靠 Bonjour 自動找主機；**外網主路徑是 Cloudflare Tunnel**（2026-11-20 起）：Mac 上的 `cloudflared` 主動連到 Cloudflare，把 `wss://<網域>` 還原成到本機 TCP 52830 的連線，手機「在外面」直接輸入網域，不需要開埠、不怕公網 IP 變動，主機程式碼不用改。**備援**是 WireGuard 通道（Mac 當伺服器），**內建於 Mac App**：自動向路由器開埠（NAT-PMP／UPnP）、以特權 helper（root LaunchDaemon）啟停 `wireguard-go`、選單顯示 QR code 給手機的官方 WireGuard App 一次性匯入，手機再手動輸入通道位址 `10.66.0.1` 連線。主機只接受私有網段來源，DeskPilot 本身不直接暴露在公網。機制見 `modules/external-access.md`，維運見 `operations.md`。
+- 區網靠 Bonjour 自動找主機；**外網主路徑是 Cloudflare Tunnel**（2026-11-20 起）：Mac 上的 `cloudflared` 主動連到 Cloudflare，把 `wss://<網域>` 還原成到本機 TCP 52830 的連線，手機「在外面」直接輸入網域，不需要開埠、不怕公網 IP 變動，主機傳輸層不用改。WireGuard 備援已於 2026-11-23 移除。外網連線在主機看來來自 `127.0.0.1`，等於主機協定暴露在公網，所以**經 Tunnel 不准首次配對**，新手機要先在區網配對。機制見 `modules/external-access.md`，維運見 `operations.md`。
 
 ## 組成
 
@@ -14,7 +14,7 @@ DeskPilot：用 iPhone 在區網（Wi-Fi）內操控 Mac 的遠端桌面 App。�
 |------|------|------|--------|
 | 共用協定 | `DeskPilot/Shared/` | 線上訊息格式、TCP 訊息框，兩個 target 都編譯 | `modules/protocol.md` |
 | Mac 主機 | `DeskPilot/DeskPilotHost/`（macOS target） | Bonjour 公告、擷取螢幕 → 硬體編碼 → 傳送；把手機輸入注入成 CGEvent | `modules/host.md` |
-| 外網通道 | `DeskPilot/DeskPilotHost/ExternalAccess/`、`DeskPilot/DeskPilotHelper/`（macOS 命令列 target，嵌進主機 App） | 自動開埠、可達性判斷、特權 helper 啟停 WireGuard、手機 QR 配對 | `modules/external-access.md` |
+| 外網連線 | 手機端 `Shared/FramedConnection.swift` 的 WebSocket 模式；主機端 `HostController.allowsPairing`；Mac 上的 cloudflared（repo 外） | Cloudflare Tunnel 傳輸、經 Tunnel 不准配對 | `modules/external-access.md` |
 | iPhone 用戶端 | `DeskPilot/DeskPilot/`（iOS target） | 找主機、硬體解碼顯示、觸控板手勢、本地游標／縮放、中文輸入、內建量測 | `modules/client.md` |
 
 資料流：iPhone 送 Hello（手機像素大小）→ 主機決定編碼解析度並開始擷取 → 影格經 TCP 推給 iPhone 顯示；反方向是 3～7 bytes 的輸入事件。建置、執行、測試方法見 `operations.md`。

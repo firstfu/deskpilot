@@ -1,6 +1,6 @@
 # DeskPilot
 
-用 iPhone 操控 Mac 的遠端桌面 App（區網直連，外網走 Cloudflare Tunnel，WireGuard 通道當備援）。詳見 `docs/context/reference/overview.md`。
+用 iPhone 操控 Mac 的遠端桌面 App（區網直連，外網走 Cloudflare Tunnel）。詳見 `docs/context/reference/overview.md`。
 
 ## Session 開始順序
 
@@ -15,11 +15,11 @@
 |------|------|--------|
 | `reference/overview.md` | 系統架構大圖 | **必讀** |
 | `reference/boundaries.md` | 編碼規範、邊界、跨全站的雷 | **必讀** |
-| `reference/operations.md` | 建置、裝到實機與看手機 log、執行主機、外網 WireGuard 維運、權限、讀 log、模擬器測試與量測腳本 | 要 build／裝實機／執行／跑量測／用模擬器驗證前，或外網連不上時 |
+| `reference/operations.md` | 建置、裝到實機與看手機 log、執行主機、Cloudflare Tunnel 維運、權限、讀 log、模擬器測試與量測腳本 | 要 build／裝實機／執行／跑量測／用模擬器驗證前，或外網連不上時 |
 | `reference/release.md` | 對外發布的現況、簽章／公證／用戶端手動步驟與發布前待辦；iPhone 端安裝管道的限制 | 要發新版給別人用、評估用戶能否直接使用前，或想在外面裝手機新版時 |
 | `reference/modules/protocol.md` | 線上協定：訊息框、訊息類型、配對與加密、座標編碼、版本規則 | 改 `Shared/`、加訊息類型、動配對／加密、兩端連不上時 |
-| `reference/modules/host.md` | Mac 主機：擷取、編碼、多螢幕切換、位元率／codec 決策、輸入注入、通道轉接、權限 | 改 `DeskPilotHost/`、連上就斷、流量或畫面異常、從通道連不進來時 |
-| `reference/modules/external-access.md` | 外網連線：自動開埠、特權 helper、WireGuard 通道、手機 QR 配對與其安全模型 | 改 `ExternalAccess/`、`DeskPilotHelper/`，或外網連不上、通道元件裝不起來、QR 配對失敗時 |
+| `reference/modules/host.md` | Mac 主機：擷取、編碼、多螢幕切換、位元率／codec 決策、輸入注入、權限 | 改 `DeskPilotHost/`、連上就斷、流量或畫面異常時 |
+| `reference/modules/external-access.md` | 外網連線：Cloudflare Tunnel 架構、安全模型（經 Tunnel 不准配對）、已移除的 WireGuard 為什麼拿掉 | 改外網路徑或配對規則、外網連不上時 |
 | `reference/modules/client.md` | iPhone 端：顯示、手勢、連線前驗證、中文輸入、內建量測 | 改 `DeskPilot/`（iOS）、黑畫面、手感或輸入問題時 |
 
 > 新增任何 reference 檔（data-model / api-spec / modules/xxx …）時，archive-to-context 會在此表補一行。

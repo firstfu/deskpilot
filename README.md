@@ -61,26 +61,24 @@ On the same Wi-Fi network, Bonjour discovers the Mac automatically. If the conne
 | Component | State |
 |---|---|
 | Same-network (LAN) connection | Verified on physical devices |
-| Remote access (cellular → tunnel → Mac) | **Not yet verified end to end** |
+| Remote access (cellular → Cloudflare Tunnel → Mac) | Verified on a physical device; long-term stability not yet measured |
 | Notarized builds / App Store / TestFlight | Not available |
 
 Figures cited in the documentation, such as roughly 1 Mbps while scrolling, come from simulator measurements and the in-app benchmark. They were not obtained under controlled laboratory conditions.
 
 ## Build from source
 
-**Requirements:** a Mac and an iPhone meeting the project's deployment targets (macOS 27, iOS 27), a matching version of Xcode, and an Apple ID. A free Apple ID is sufficient to build, but **apps signed with it expire after approximately 7 days** and must be reinstalled. Go is required only for the optional remote-access feature.
+**Requirements:** a Mac and an iPhone meeting the project's deployment targets (macOS 27, iOS 27), a matching version of Xcode, and an Apple ID. A free Apple ID is sufficient to build, but **apps signed with it expire after approximately 7 days** and must be reinstalled.
 
 ```sh
 git clone https://github.com/firstfu/deskpilot.git && cd deskpilot
-scripts/build-wireguard-go.sh   # only if you want remote access
 open DeskPilot/DeskPilot.xcodeproj
 ```
 
 1. In Xcode, select your own Team under Signing for every target. Change the bundle identifiers (`tw.firstfu.*`) if necessary.
-2. Set `teamID` in [`DeskPilot/Shared/HelperProtocol.swift`](DeskPilot/Shared/HelperProtocol.swift) to your Team ID. The privileged helper accepts only a host app signed by the same team; without this change, remote access cannot reach the helper.
-3. Build **DeskPilotHost** for the Mac and **DeskPilot** for the iPhone.
+2. Build **DeskPilotHost** for the Mac and **DeskPilot** for the iPhone.
    Keep the Mac build in Xcode's default DerivedData rather than a temporary location such as `/private/tmp`; otherwise the Screen Recording permission will not persist.
-4. On the Mac, grant **Screen & System Audio Recording** and **Accessibility** under System Settings → Privacy & Security, then restart the host app.
+3. On the Mac, grant **Screen & System Audio Recording** and **Accessibility** under System Settings → Privacy & Security, then restart the host app.
 
 ### Connect on the same network
 
@@ -89,24 +87,22 @@ open DeskPilot/DeskPilot.xcodeproj
 
 ## Remote access (optional)
 
-Outside your home network, DeskPilot connects through a WireGuard tunnel with the Mac acting as the server. All required components are built into the Mac app:
+Outside your home network, DeskPilot connects through a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/). The Mac runs `cloudflared`, which keeps an outbound connection to Cloudflare, so no router ports are opened and a changing public IP address does not matter. The phone needs no VPN app.
 
-1. In the menu bar, enable **External access (auto port mapping)**. Your router must support NAT-PMP or UPnP; otherwise, forward UDP 51820 manually.
-2. Select **Install tunnel components…** and approve the request once under System Settings → Login Items.
-3. Select **Pair phone (external)…** to display a QR code, then scan it with the **official WireGuard app** on the iPhone.
-4. On the phone, turn off Wi-Fi, enable the tunnel, choose "Outside" in DeskPilot, and enter `10.66.0.1`.
+1. With your own Cloudflare account and domain, create a tunnel whose ingress maps a hostname (for example `deskpilot.example.com`) to `tcp://127.0.0.1:52830`, and keep `cloudflared` running on the Mac.
+2. **Pair the phone on the same Wi-Fi first.** Pairing is refused over the tunnel.
+3. On the phone, choose "Outside" in DeskPilot and enter the hostname. Turn off any other VPN on the phone.
 
-Pair while you are physically near the Mac. The QR code embeds your current public IP address and must be regenerated if that address changes. Remote access does not work behind carrier-grade NAT (CGNAT).
+Tunnel setup is not yet built into the app; see [operations notes](docs/context/reference/operations.md).
 
 ## Security model
 
-- Every connection is encrypted and requires pairing. See the [protocol notes](docs/context/reference/modules/protocol.md).
-- The tunnel exposes WireGuard only. The host accepts connections from private address ranges exclusively, and DeskPilot itself is never exposed to the public internet.
-- The privileged helper runs as root but exposes a fixed set of methods and accepts no paths, command strings, or configuration files. Callers are verified by code signature. The phone's private key exists only in the QR code and is not retained by the Mac.
-- Face ID (or the device passcode) is required before each connection, so a lost phone does not grant access to your Mac.
+- Every connection is encrypted end to end and requires pairing. Cloudflare terminates TLS but sees only ciphertext. See the [protocol notes](docs/context/reference/modules/protocol.md).
+- Anyone who knows the hostname can reach the host through the tunnel, so the host **refuses first-time pairing over the tunnel**. Only phones already paired on the LAN can connect from outside, which prevents strangers from triggering a pairing prompt on your Mac.
+- Face ID (or the device passcode) is required before each connection, and a lost phone can be removed from the paired-device list on the Mac.
 
 > [!WARNING]
-> Free Apple Development certificates are not notarized, so signature verification is weaker than with Developer ID. At present, DeskPilot is suitable for personal use only.
+> Free Apple Development certificates are not notarized. At present, DeskPilot is suitable for personal use only.
 
 ## FAQ
 
@@ -131,7 +127,7 @@ These gestures send <kbd>⌃</kbd>-arrow shortcuts. In System Settings → Keybo
 <details>
 <summary><b>Remote access cannot connect</b></summary>
 
-Confirm that your router supports NAT-PMP or UPnP (or that UDP 51820 is forwarded), that you are not behind CGNAT, and that the QR code was generated with your current public IP address. Note that this path has not yet been verified end to end.
+Confirm that `cloudflared` is running on the Mac and its tunnel is registered, that the host app is running, and that no other VPN is active on the phone. If the phone says pairing is not allowed from outside, pair it once on the same Wi-Fi.
 </details>
 
 ## Project layout
@@ -139,18 +135,13 @@ Confirm that your router supports NAT-PMP or UPnP (or that UDP 51820 is forwarde
 | Path | Contents |
 |---|---|
 | `DeskPilot/DeskPilot/` | iPhone app: display, gestures, Chinese input |
-| `DeskPilot/DeskPilotHost/` | Mac host: capture, encoding, input injection, remote-access control |
-| `DeskPilot/DeskPilotHelper/` | Privileged helper (root LaunchDaemon) that starts and stops WireGuard |
+| `DeskPilot/DeskPilotHost/` | Mac host: capture, encoding, input injection |
 | `DeskPilot/Shared/` | Protocol and cryptography shared by both sides |
 | `docs/context/` | Architecture, protocol, operations, and known pitfalls — start with [`overview.md`](docs/context/reference/overview.md) |
 
 ## Contributing
 
 DeskPilot is maintained by a single developer, and issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). The most useful bug reports include your macOS and iOS versions, whether you were on LAN or remote access, and what the screen displayed.
-
-## Third-party components
-
-Remote access uses [wireguard-go](https://git.zx2c4.com/wireguard-go) (MIT), compiled from pinned upstream source. `wireguard-tools` is deliberately not bundled, to avoid GPL obligations.
 
 ## License
 

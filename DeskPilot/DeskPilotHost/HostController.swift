@@ -58,7 +58,6 @@ final class HostController {
     private(set) var pairedDevices: [PairingStore.Entry] = PairingStore.all()
 
     private var listener: NWListener?
-    private let tunnelRelay = TunnelRelay(port: ProtocolConstants.port)
     private var session: HostSession?
     /// 尚未通過驗證的連線。驗證前不取代目前的連線，陌生人連進來也踢不掉使用者。
     private var pending: [ObjectIdentifier: HostSession] = [:]
@@ -125,8 +124,6 @@ final class HostController {
         switch state {
         case .ready:
             if session == nil { status = .listening }
-            // 主監聽器綁好萬用位址後才開通道轉接；轉接器若先綁特定位址，主監聽器會因埠被占用而啟動失敗
-            tunnelRelay.start()
         case .failed(let e): status = .failed(e.localizedDescription)
         default: break
         }
@@ -147,8 +144,8 @@ final class HostController {
         for s in pending.values where s.deviceID == id { s.stop() }
     }
 
-    /// 只接受私有網段來的連線（區網、WireGuard 通道 10.66.0.0/24、本機）。
-    /// 路由器只轉送 WireGuard 的 UDP 埠，正常不會有公網連線進來；這層是防路由器設錯的保險。
+    /// 只接受私有網段來的連線（區網、本機）。外網經 Cloudflare Tunnel 進來時，cloudflared 在本機轉接，來源是 127.0.0.1。
+    /// 路由器沒有轉送任何埠，正常不會有公網連線直接進來；這層是防路由器設錯的保險。
     nonisolated static func isPrivate(_ endpoint: NWEndpoint) -> Bool {
         guard case let .hostPort(host, _) = endpoint else { return false }
         switch host {
@@ -165,6 +162,18 @@ final class HostController {
         }
     }
 
+    /// 這條連線能不能發起配對。配對要人在 Mac 旁按允許，只開放給區網。
+    /// 本機回送位址的連線就是 cloudflared 從公網轉進來的：不准配對，
+    /// 否則任何知道網域的人都能讓 Mac 跳出配對視窗，誤按一次就拿到整台 Mac 的控制權。
+    nonisolated static func allowsPairing(_ endpoint: NWEndpoint) -> Bool {
+        guard case let .hostPort(host, _) = endpoint else { return false }
+        switch host {
+        case .ipv4(let a): return !a.isLoopback
+        case .ipv6(let a): return !(a.isLoopback || (a.asIPv4?.isLoopback ?? false))
+        default: return false
+        }
+    }
+
     private func accept(_ conn: NWConnection) {
         guard Self.isPrivate(conn.endpoint) else {
             Self.log.notice("拒絕非私有網段的連線：\(String(describing: conn.endpoint), privacy: .public)")
@@ -175,7 +184,7 @@ final class HostController {
             conn.cancel()
             return
         }
-        let s = HostSession(connection: conn)
+        let s = HostSession(connection: conn, allowsPairing: Self.allowsPairing(conn.endpoint))
         let key = ObjectIdentifier(s)
         s.onAuthorized = { [weak self, weak s] name in
             Task { @MainActor in
@@ -335,8 +344,12 @@ final class HostSession: @unchecked Sendable {
     /// 允許同時「在路上」的影格數。超過就丟掉新影格，延遲才不會越積越多。
     private static let maxFramesInFlight = 2
 
-    init(connection: NWConnection) {
+    /// 這條連線能否發起首次配對（經 Cloudflare Tunnel 來的不行，見 `HostController.allowsPairing`）。
+    private let allowsPairing: Bool
+
+    init(connection: NWConnection, allowsPairing: Bool) {
         framed = FramedConnection(connection: connection, queue: queue)
+        self.allowsPairing = allowsPairing
     }
 
     func start() {
@@ -406,6 +419,13 @@ final class HostSession: @unchecked Sendable {
             resumeDeviceName = name
             return
         }
+        guard allowsPairing else {
+            // 回「不允許從這裡配對」(2)；舊版手機會當成被拒絕。晚一點才斷線，否則回覆可能來不及送出
+            HostController.log.notice("交握：外網來的配對請求，拒絕（裝置 \(name, privacy: .public)）")
+            framed.send(.pairResult, Data([PairResultCode.remoteNotAllowed]))
+            queue.asyncAfter(deadline: .now() + 1) { [weak self] in self?.framed.cancel() }
+            return
+        }
         pairingKeys = keys
         pairingDevice = (hs.deviceID, name)
         var answered = false
@@ -424,7 +444,7 @@ final class HostSession: @unchecked Sendable {
     private func finishPairing(_ allow: Bool) {
         guard let keys = pairingKeys, let device = pairingDevice else { return }
         pairingKeys = nil
-        framed.send(.pairResult, Data([allow ? 1 : 0]))
+        framed.send(.pairResult, Data([allow ? PairResultCode.allowed : PairResultCode.rejected]))
         guard allow else {
             framed.cancel()
             return

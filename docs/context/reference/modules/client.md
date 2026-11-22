@@ -38,16 +38,16 @@ iOS App。`ClientSession`（主執行緒狀態）＋ `ClientLink`（自己的序
 - **快捷鍵列**（`ShortcutBar.swift`）：上方一排四個大按鈕（Mission Control ⌃↑、Spotlight ⌘Space、切換 App ⌘Tab、截圖 ⌘⇧5），下方是可橫向捲動的修飾鍵與按鍵列。⇧⌃⌥⌘ 是**黏滯修飾鍵**（`ClientSession.armedModifiers`），按一下武裝、用一次就放開；套用到快捷鍵列的按鍵，也套用到手機鍵盤打的下一個英數字。另有拷貝／貼上、方向鍵、Esc／Tab／Return、常用組合鍵。
 - **剪貼簿**：「貼上」＝送手機剪貼簿文字到 Mac、200 ms 後送 ⌘V；「拷貝」＝送 ⌘C、300 ms 後向主機要 Mac 剪貼簿並寫進手機。刻意不做自動同步：iOS 16 起程式讀 `UIPasteboard` 會跳「允許貼上」提示，改成使用者按鈕觸發才合理。
 - **自動重連**：只有「已連上過、沒被明確拒絕」的中斷才重連（延遲 1、2、3、5、8、10、15、20 秒，共 8 次），畫面停在最後一張並顯示提示；重連不再問 Face ID；回到前景會立刻重試；重連成功後重送畫質、省流量、聲音設定。第一次就連不上（IP 打錯、Mac 沒開）不重試，直接顯示失敗。
-- **省流量偏好**自動／開／關，存在 UserDefaults；自動模式用 `NWPathMonitor.isExpensive` 判斷行動網路。WireGuard 通道本身不會被當成計量網路，所以要靠系統預設路由判斷。
+- **省流量偏好**自動／開／關，存在 UserDefaults；自動模式用 `NWPathMonitor.isExpensive` 判斷行動網路。VPN 通道本身不會被當成計量網路，所以要靠系統預設路由判斷。
 - **聲音**：`AudioPlayer` 用 `AVAudioEngine` 播 AAC，排隊超過 10 塊（約 0.2 秒）就丟掉新封包，延遲優先。
 
 雙指捲動與捏合同時辨識，捏合幅度超過 8% 才算縮放，避免兩者打架。游標是本地繪製的 CAShapeLayer，放大時游標靠近邊緣會自動平移畫面。
 
 ## 手動輸入 IP（外網）與配對
 
-輸入框（`HostListScreen.manualEndpoint`）：純 IPv4／IPv6 → TCP 52830（WireGuard 通道位址）；其他字串視為網域，補成 `wss://<網域>` 走 Cloudflare Tunnel（機制見 `external-access.md`「主路徑」）。兩條路徑都沒有 Bonjour 主機 ID，配對規則相同。
+輸入框（`HostListScreen.manualEndpoint`）：其他字串視為網域，補成 `wss://<網域>` 走 Cloudflare Tunnel（機制見 `external-access.md`）；純 IPv4／IPv6 → TCP 52830（區網 Bonjour 找不到時用）。兩種都沒有 Bonjour 主機 ID。經 Tunnel 不能首次配對，主機回 `pairResult`=2 時顯示「外網不能做首次配對」。
 
-「在外面」輸入通道位址 `10.66.0.1` 連線，沒有 Bonjour 公告的主機 ID。行為與已知的坑見 `protocol.md`「配對與加密」（Keychain 保留舊紀錄、`authFailed` 重試迴圈、`forcePairNext`）。手機端的外網通道由官方 WireGuard App 提供，DeskPilot 本身不建通道。
+沒有主機 ID 時的行為與已知的坑見 `protocol.md`「配對與加密」（Keychain 保留舊紀錄、`authFailed` 重試迴圈、`forcePairNext`）。
 
 ## 連線前驗證本人
 
