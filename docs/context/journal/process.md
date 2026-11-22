@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-23 — Cloudflare Tunnel 手機實機端到端成功（`HASH`）
+
+- **變更**：沒改程式碼。重開機後主機沒自動啟動，把 `DeskPilotHost.app` 加進登入項目（已記在 `operations.md`）；新版裝到 iPhone 15 Plus；`external-access.md` 新增「手機開著 WireGuard 時走 Tunnel 會連不上」。
+- **為什麼**：使用者在外面連不上。Mac 重開機後 cloudflared（LaunchAgent）自己起來，但主機沒起來，兩條路都斷；主機補起來後，手機 5G 仍連不上，主機 log 完全沒有連線，原因是手機的 WireGuard 開著。關掉 WireGuard 後，手機在 5G 下輸入網域連上、畫面正常串流。
+- **驗證**：手機實機經 5G 走 Tunnel 連上（使用者回報）。**未驗證**：長時間穩定度與延遲；測試中主機 log 曾見連線每 4～10 秒重置一次，當時 WireGuard 開著，是否同因沒確認。
+- **下一步**：實際用一陣子看斷線與延遲；修 `authFailed` 送完就斷線；評估 Cloudflare Access；要給別人用時把 Tunnel 設定做進 App。
+
 ### 2026-11-20 — 外網改走 Cloudflare Tunnel（WebSocket 傳輸），WireGuard 留作備援（`884fe4c`）
 
 - **變更**：`FramedConnection` 加 WebSocket 模式（`webSocketParameters()`、二進位訊息送框、收端當位元組流重新切框）；手機「在外面」輸入框：純 IP 走 TCP、網域走 `wss://`。主機程式碼沒改。Mac 上建了 `deskpilot` Tunnel（ingress `tcp://127.0.0.1:52830`）與 DNS 記錄，cloudflared 以使用者 LaunchAgent 常駐（repo 外）。文件：`external-access.md` 新增「主路徑」、`operations.md` 新增 Tunnel 維運、`client.md`／`protocol.md`／`overview.md` 補說明。

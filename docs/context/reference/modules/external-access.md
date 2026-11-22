@@ -90,6 +90,9 @@ Homebrew 版 `wireguard-go` 的 utun 介面，Network.framework 看不到、`NWL
 ### zsh 的 `log` 要用 `/usr/bin/log`
 查主機 log 時，zsh 的內建 `log` 會蓋掉系統指令，報 `too many arguments`。用 `/usr/bin/log show --last 10m --info --debug --predicate 'subsystem == "tw.firstfu.DeskPilotHost"' --style compact`。
 
+### 手機開著 WireGuard 時走 Tunnel 會連不上
+2026-11-23 實測：手機 5G、WireGuard 通道開著，輸入網域連線，主機完全沒收到連線；關掉 WireGuard 後就連上、畫面正常串流。WireGuard 開著時手機的流量（含 DNS）會先導進通道，通道沒通就整個卡住。**走 Tunnel 時手機的 WireGuard 要關掉**；兩條路徑二選一。
+
 ### 剛建好的 Tunnel 網域，本機一時解析不到
 建 DNS 記錄前查過一次（NXDOMAIN）的話，Mac 的系統 DNS 快取會記住「不存在」，`getaddrinfo` 回 `nodename nor servname provided`，但 `dig @1.1.1.1` 已有記錄。等快取過期或 `sudo dscacheutil -flushcache` 即可，不是 Tunnel 壞了。
 
