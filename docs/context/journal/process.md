@@ -4,7 +4,7 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
-### 2026-11-23 — 移除 WireGuard 備援；經 Cloudflare Tunnel 的連線不准首次配對（`待填`）
+### 2026-11-23 — 移除 WireGuard 備援；經 Cloudflare Tunnel 的連線不准首次配對（`8ba0868`）
 
 - **變更**：刪掉整套 WireGuard：`DeskPilotHelper` target、`HelperSupport/`、`Shared/HelperProtocol.swift`、`DeskPilotHost/ExternalAccess/`（自動開埠、可達性、DDNS、QR 配對）、`TunnelRelay`、`scripts/build-wireguard-go.sh`、主機 Info.plist 的 ATS 例外與選單項目；pbxproj 用 xcodeproj gem 移除 target 與三個 build phase。主機新增 `HostController.allowsPairing`：來源是回送位址（cloudflared 轉進來的）就不准配對，回 `pairResult`=2（新增 `PairResultCode`）、1 秒後斷線；手機收到 2 顯示「外網不能做首次配對」，「在外面」預設位址改成空字串。文件：`external-access.md` 改寫成只有 Tunnel，並在最後留一段「已移除：WireGuard」；`overview`／`operations`／`release`／`host`／`client`／`protocol`、根 `CLAUDE.md` 索引、兩份 README、CONTRIBUTING 同步。
 - **為什麼**：使用者問 Tunnel 有沒有安全問題。Tunnel 讓主機協定直接暴露在公網，cloudflared 的連線來源是 `127.0.0.1`，原本「只接受私有網段」的檢查形同失效，任何知道網域的人都能讓 Mac 跳出配對視窗，誤按一次允許就拿到整台 Mac。使用者接著說 WireGuard 不用了、手機端已刪，要求整套從 repo 移除（留著只是多一個 root 常駐程式和路由器上的開放埠）。
