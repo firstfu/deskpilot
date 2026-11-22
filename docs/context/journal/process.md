@@ -4,7 +4,7 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
-### 2026-11-23 — Cloudflare Tunnel 手機實機端到端成功（`HASH`）
+### 2026-11-23 — Cloudflare Tunnel 手機實機端到端成功（`bdf9631`）
 
 - **變更**：沒改程式碼。重開機後主機沒自動啟動，把 `DeskPilotHost.app` 加進登入項目（已記在 `operations.md`）；新版裝到 iPhone 15 Plus；`external-access.md` 新增「手機開著 WireGuard 時走 Tunnel 會連不上」。
 - **為什麼**：使用者在外面連不上。Mac 重開機後 cloudflared（LaunchAgent）自己起來，但主機沒起來，兩條路都斷；主機補起來後，手機 5G 仍連不上，主機 log 完全沒有連線，原因是手機的 WireGuard 開著。關掉 WireGuard 後，手機在 5G 下輸入網域連上、畫面正常串流。
