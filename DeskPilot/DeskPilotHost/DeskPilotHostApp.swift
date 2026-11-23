@@ -37,6 +37,16 @@ private struct MenuBarIcon: View {
     var body: some View {
         Image(systemName: symbol)
             .task {
+                // 已有另一份主機在跑（例如舊的登入項目也把它帶起來）：留那一份，自己結束，避免搶 52830 埠
+                let bundleID = Bundle.main.bundleIdentifier ?? ""
+                let me = ProcessInfo.processInfo.processIdentifier
+                if NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                    .contains(where: { $0.processIdentifier != me }) {
+                    HostController.log.notice("已有另一個主機在執行，這份結束")
+                    NSApp.terminate(nil)
+                    return
+                }
+                LaunchAtLogin.applyDefault()
                 controller.start()
                 // 缺權限（通常是第一次使用）或指定要看視窗（量測用）時，啟動就打開主視窗
                 if !controller.permissionsOK || ProcessInfo.processInfo.environment["DESKPILOT_SHOW_WINDOW"] != nil {
@@ -61,6 +71,31 @@ private struct MenuBarIcon: View {
     }
 }
 
+/// 開機自動啟動。預設開：主機沒起來時區網、外網都連不上，而重開機後最容易忘記手動開它。
+/// 使用者在選單關掉才記住不要；每次啟動都補註冊一次，換了 build 路徑也會跟上。
+private enum LaunchAtLogin {
+    private static let optOutKey = "launchAtLoginOptOut"
+
+    static func applyDefault() {
+        guard !UserDefaults.standard.bool(forKey: optOutKey), SMAppService.mainApp.status != .enabled else { return }
+        register(true)
+    }
+
+    static func set(_ on: Bool) {
+        UserDefaults.standard.set(!on, forKey: optOutKey)
+        register(on)
+    }
+
+    private static func register(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            HostController.log.notice("開機自動啟動：\(on ? "開" : "關", privacy: .public)")
+        } catch {
+            HostController.log.error("設定開機自動啟動失敗：\(error.localizedDescription, privacy: .public)")
+        }
+    }
+}
+
 private struct MenuContent: View {
     let controller: HostController
     @Environment(\.openWindow) private var openWindow
@@ -78,12 +113,8 @@ private struct MenuContent: View {
         }
         Toggle("開機時自動啟動", isOn: $launchAtLogin)
             .onChange(of: launchAtLogin) { _, on in
-                do {
-                    if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                } catch {
-                    HostController.log.error("設定開機自動啟動失敗：\(error.localizedDescription, privacy: .public)")
-                    launchAtLogin = SMAppService.mainApp.status == .enabled
-                }
+                LaunchAtLogin.set(on)
+                launchAtLogin = SMAppService.mainApp.status == .enabled
             }
         Divider()
         Button("結束 DeskPilot") { NSApp.terminate(nil) }

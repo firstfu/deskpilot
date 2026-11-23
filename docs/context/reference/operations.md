@@ -28,7 +28,7 @@
   - RunProject 重跑時舊主機程序不會結束，Bonjour 名稱會變成「…(2)」「…(3)」，手機清單出現多個主機、點到舊的就連不上。
   - Xcode 的 StopProject 停的是「目前 scheme 的 App」，切到 iOS scheme 後按停止會把手機端 App 停掉，而不是主機。
 - 每次重開前先 `pkill -f DeskPilotHost.app`。
-- **重開機後主機不會自己起來**（cloudflared 的 LaunchAgent 會），兩條外網路徑都會因此連不上。2026-11-23 已用 System Events 把 DerivedData 裡的 `DeskPilotHost.app` 加進登入項目；換 build 路徑要重加。
+- **開機自動啟動**：主機預設用 `SMAppService.mainApp` 註冊登入項目，每次啟動都補一次（見 `modules/host.md`「選單列 App 與權限引導」）。2026-11-23 之前是用 System Events 把 DerivedData 裡的 `DeskPilotHost.app` 加進登入項目，那筆還在；兩者同時帶起來時，後起的那份會自己結束。主機沒起來時區網與外網都連不上（cloudflared 的 LaunchAgent 會自己起來，不代表主機也起來了）。
 - macOS 防火牆開著時，**重 build 主機後可能被改成阻擋連入**，區網與外網都會連不上，處理方式見 `modules/host.md`「重 build 主機後被防火牆擋」。
 - 量測腳本 `scripts/host-bench.sh`：
   - `start [hevc|h264] [位元率 bps]`：重開主機（預設 HEVC、2 Mbps），並排除 Device Hub 視窗。

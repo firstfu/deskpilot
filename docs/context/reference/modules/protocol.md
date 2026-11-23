@@ -46,6 +46,7 @@
 | 手機→主機 | `setSaver` (0x0B) | 省流量模式 UInt8：1 開、0 關 |
 | 手機→主機 | `setAudio` (0x0C) | 聲音串流 UInt8：1 開、0 關，預設關 |
 | 主機→手機 | `audioFormat` (0x8B)／`audioFrame` (0x8C) | 取樣率＋聲道數；之後每個 `audioFrame` 是單一 AAC-LC 封包，靜音時不送 |
+| 主機→手機 | `hostError` (0x8D) | 主機無法串流、即將斷線的原因（UTF-8 給使用者看的文字），送完等 1 秒斷線。後來加的，舊版手機會略過，所以沒升協定版本 |
 | 雙向 | `handshake` (0x08)／`handshakeAck` (0x87)／`authFailed` (0x88)／`pairResult` (0x89)／`encrypted` (0x7F) | 見上方「配對與加密」 |
 
 ## ⚠️ 版本要完全相同

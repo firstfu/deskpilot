@@ -663,6 +663,11 @@ final class ClientLink: @unchecked Sendable {
             if let d = try? DisplayInfoMessage.decode(payload) { onDisplayInfo?(d) }
         case .hostClipboard:
             onHostClipboard?(String(data: payload, encoding: .utf8) ?? "")
+        case .hostError:
+            // 主機說明為什麼要斷線（例如沒有可擷取的螢幕）；記成拒絕原因，斷線時顯示這段而不是「連線中斷」
+            let reason = String(data: payload, encoding: .utf8) ?? ""
+            Self.log.notice("主機錯誤：\(reason, privacy: .public)")
+            onRejected?(reason.isEmpty ? "Mac 無法開始串流" : reason)
         case .audioFormat:
             guard audioPlaybackWanted, let f = try? AudioFormatMessage.decode(payload) else { return }
             audioPlayer?.stop()

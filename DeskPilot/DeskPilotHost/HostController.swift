@@ -9,6 +9,7 @@
 import AppKit
 import CoreMedia
 import CryptoKit
+import IOKit.pwr_mgt
 import Network
 import Observation
 import os
@@ -303,6 +304,15 @@ final class HostSession: @unchecked Sendable {
     private var hello: HelloMessage?
     private var displayID = CGMainDisplayID()
     private var switching = false
+    /// 擷取中斷後正在接回（只在 `queue` 上存取）。
+    private var recovering = false
+    /// 最近幾次接回擷取的時間，用來判斷是否反覆中斷該放棄。
+    private var recoveryTimes: [TimeInterval] = []
+    /// 連線已結束；重試中的開始串流看到就停手。
+    private let ended = OSAllocatedUnfairLock(initialState: false)
+    /// 串流期間不讓螢幕閒置睡著的電源宣告。
+    private let displayAssertion = OSAllocatedUnfairLock<IOPMAssertionID?>(initialState: nil)
+    private var screenObserver: NSObjectProtocol?
     /// 手機放大時要原生解析度（小字才清楚）；平常縮到手機像素。
     private var nativeDetail = false
     /// 換畫質進行中時，後到的請求先記著，做完再套最新那個（只在 `queue` 上存取）。
@@ -364,6 +374,20 @@ final class HostSession: @unchecked Sendable {
             }
         }
         framed.start()
+        // 螢幕配置變了（闔上筆電、拔插外接螢幕）：正在擷取的螢幕不見就換到還在的那台，否則只更新手機的螢幕數
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.queue.async {
+                guard self.hello != nil, self.authorized else { return }
+                if Self.activeDisplays().contains(self.displayID) {
+                    if !self.switching, !self.recovering { self.sendDisplayInfo() }
+                } else {
+                    self.recoverCapture("螢幕 \(self.displayID) 不見了")
+                }
+            }
+        }
         // 交握逾時：10 秒內沒完成交握就斷線，避免閒置連線佔位
         queue.asyncAfter(deadline: .now() + 10) { [weak self] in
             guard let self, !self.handshakeDone else { return }
@@ -493,13 +517,7 @@ final class HostSession: @unchecked Sendable {
                 return
             }
             self.hello = hello
-            // 主機啟動後螢幕可能換過（闔上筆電、外接螢幕拔插），記住的螢幕不在了就改用目前的主螢幕
-            if !Self.activeDisplays().contains(displayID) {
-                HostController.log.notice("螢幕 \(self.displayID) 已不在，改用主螢幕 \(CGMainDisplayID())")
-                displayID = CGMainDisplayID()
-                injector.displayID = displayID
-            }
-            Task { await self.beginStreaming(hello, display: self.displayID) }
+            Task { await self.beginStreaming(hello) }
         case .input:
             guard let event = try? InputEvent.decode(payload) else { return }
             switch event {
@@ -523,7 +541,7 @@ final class HostSession: @unchecked Sendable {
         case .selectDisplay:
             guard let index = payload.first.map(Int.init) else { return }
             let list = Self.activeDisplays()
-            guard list.indices.contains(index), list[index] != displayID, !switching, let hello else { return }
+            guard list.indices.contains(index), list[index] != displayID, !switching, !recovering, let hello else { return }
             switching = true
             Task { await self.switchDisplay(to: list[index], hello: hello) }
         case .ping:
@@ -623,12 +641,79 @@ final class HostSession: @unchecked Sendable {
     private func switchDisplay(to display: CGDirectDisplayID, hello: HelloMessage) async {
         await capturer.stopAndWait()
         lastFrame.withLock { $0 = nil }
-        displayID = display
-        injector.displayID = display
+        useDisplay(display)
         injector.centerCursor()
         lastCursor = nil
         await beginStreaming(hello, display: display)
         switching = false
+    }
+
+    private func useDisplay(_ display: CGDirectDisplayID) {
+        displayID = display
+        injector.displayID = display
+    }
+
+    /// 這次該擷取的螢幕：指定的或記住的還在就用它，不在了（闔上筆電、拔掉外接螢幕）就改用目前的主螢幕；
+    /// 完全沒有作用中的螢幕時回 nil。
+    private func resolveDisplay(preferred: CGDirectDisplayID?) -> CGDirectDisplayID? {
+        let list = Self.activeDisplays()
+        for candidate in [preferred, displayID].compactMap({ $0 }) where list.contains(candidate) {
+            return candidate
+        }
+        guard let main = list.first else { return nil }
+        HostController.log.notice("螢幕 \(self.displayID, privacy: .public) 已不在，改用主螢幕 \(main, privacy: .public)")
+        return main
+    }
+
+    /// 擷取中途停掉（螢幕被拔掉、闔上筆電、睡著）或螢幕配置變了：停掉舊擷取，換到還在的螢幕重開。
+    /// 短時間內反覆失敗就放棄，避免無限重試。
+    private func recoverCapture(_ reason: String) {
+        guard let hello, !switching, !recovering, !ended.withLock({ $0 }) else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        recoveryTimes = recoveryTimes.filter { now - $0 < 60 } + [now]
+        guard recoveryTimes.count <= 3 else {
+            HostController.log.error("擷取一分鐘內中斷超過 3 次，放棄")
+            fail("Mac 的螢幕擷取一直中斷，請檢查 Mac 的螢幕狀態後再連一次")
+            return
+        }
+        HostController.log.notice("擷取中斷（\(reason, privacy: .public)），嘗試接回")
+        recovering = true
+        Task {
+            await capturer.stopAndWait()
+            lastFrame.withLock { $0 = nil }
+            lastCursor = nil
+            await beginStreaming(hello)
+            queue.async { self.recovering = false }
+        }
+    }
+
+    /// 告訴手機為什麼斷線，等 1 秒再斷（立刻斷的話回覆可能送不到，見 external-access.md）。
+    private func fail(_ message: String) {
+        onError?(message)
+        framed.send(.hostError, Data(message.utf8))
+        queue.asyncAfter(deadline: .now() + 1) { self.framed.cancel() }
+    }
+
+    /// 叫醒螢幕並在串流期間不讓它因閒置而睡著：睡著的螢幕 ScreenCaptureKit 擷取不到。
+    private func keepDisplayAwake() {
+        var wake: IOPMAssertionID = 0
+        IOPMAssertionDeclareUserActivity("DeskPilot 遠端連線" as CFString, kIOPMUserActiveLocal, &wake)
+        displayAssertion.withLock { id in
+            guard id == nil else { return }
+            var newID: IOPMAssertionID = 0
+            if IOPMAssertionCreateWithName(kIOPMAssertPreventUserIdleDisplaySleep as CFString,
+                                           IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                           "DeskPilot 遠端連線中" as CFString, &newID) == kIOReturnSuccess {
+                id = newID
+            }
+        }
+    }
+
+    private func releaseDisplayAssertion() {
+        displayAssertion.withLock { id in
+            if let id { IOPMAssertionRelease(id) }
+            id = nil
+        }
     }
 
     /// 編碼解析度：平常縮到手機像素（多出來的像素手機顯示不了，純浪費流量）；
@@ -693,7 +778,32 @@ final class HostSession: @unchecked Sendable {
     }
 
     /// 依手機螢幕大小決定編碼解析度，啟動擷取與編碼。
-    private func beginStreaming(_ hello: HelloMessage, display: CGDirectDisplayID) async {
+    /// 螢幕可能剛睡醒或剛換過配置，所以失敗會叫醒螢幕、改用還在的螢幕，每秒重試一次，最多 5 次；都失敗才告訴手機原因並斷線。
+    private func beginStreaming(_ hello: HelloMessage, display preferred: CGDirectDisplayID? = nil) async {
+        var lastError = ""
+        for attempt in 0..<5 {
+            if attempt > 0 { try? await Task.sleep(for: .seconds(1)) }
+            if ended.withLock({ $0 }) { return }
+            keepDisplayAwake()
+            guard let display = resolveDisplay(preferred: preferred) else {
+                lastError = "Mac 沒有可用的螢幕（筆電闔上又沒接外接螢幕？）"
+                HostController.log.notice("沒有作用中的螢幕（第 \(attempt + 1, privacy: .public) 次）")
+                continue
+            }
+            useDisplay(display)
+            do {
+                try await startCapture(hello, display: display)
+                return
+            } catch {
+                lastError = error.localizedDescription
+                HostController.log.notice("開始串流失敗（第 \(attempt + 1, privacy: .public) 次）：\(lastError, privacy: .public)")
+            }
+        }
+        HostController.log.error("無法開始串流：\(lastError, privacy: .public)")
+        queue.async { self.fail("Mac 無法開始串流：\(lastError)") }
+    }
+
+    private func startCapture(_ hello: HelloMessage, display: CGDirectDisplayID) async throws {
         let bounds = CGDisplayBounds(display)
         let geo = Self.geometry(display: display, native: nativeDetail, hello: hello)
         let (w, h) = (geo.width, geo.height)
@@ -711,7 +821,10 @@ final class HostSession: @unchecked Sendable {
             }
             let enc = try installEncoder(width: w, height: h)
             capturer.onFrame = { [weak self] pb, pts, dirty in self?.captured(pb, pts, dirty) }
-            capturer.onStop = { [weak self] _ in self?.framed.cancel() }
+            capturer.onStop = { [weak self] error in
+                guard let self else { return }
+                self.queue.async { self.recoverCapture(error.localizedDescription) }
+            }
             capturer.onAudio = { [weak self] sample in self?.encodeAudio(sample) }
             try await capturer.start(displayID: display, width: w, height: h, fps: saverOn ? 30 : 60, audio: audioWanted)
 
@@ -725,10 +838,6 @@ final class HostSession: @unchecked Sendable {
                 if self.cursorTimer == nil { self.startCursorReporting() }
                 if self.refineTimer == nil { self.startRefining() }
             }
-        } catch {
-            HostController.log.error("無法開始串流：\(error.localizedDescription, privacy: .public)")
-            onError?(error.localizedDescription)
-            framed.cancel()
         }
     }
 
@@ -810,6 +919,10 @@ final class HostSession: @unchecked Sendable {
     }
 
     private func teardown() {
+        ended.withLock { $0 = true }
+        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        screenObserver = nil
+        releaseDisplayAssertion()
         cursorTimer?.cancel()
         cursorTimer = nil
         refineTimer?.cancel()

@@ -13,7 +13,8 @@ macOS App，非沙箱（`ENABLE_APP_SANDBOX = NO`，CGEvent 注入需要）。�
 - `LSUIElement`（Info.plist）：沒有 Dock 圖示，只有選單列圖示（正常 `display`、已連線 `display.and.arrow.down`、缺權限 `exclamationmark.triangle`）。主機在選單列圖示的 `.task` 啟動，主視窗 `defaultLaunchBehavior(.suppressed)` 平常不開。
 - 主視窗自動跳出的時機：缺任一權限、手機要求配對（要看確認碼）、環境變數 `DESKPILOT_SHOW_WINDOW` 有設（量測用，`host-bench.sh start` 已帶，探針標記在視窗上要看得到）。
 - 權限清單每秒輪詢更新，使用者在系統設定打開開關後視窗自動打勾。螢幕錄製在授權後**要重開 App 才生效**（`needsRelaunch`＝啟動時沒權限、現在有），視窗提供「立即重新啟動」：交給 shell 延遲 1 秒再 `open -n`，讓舊程序先放掉監聽埠。
-- 選單有「開機時自動啟動」（`SMAppService.mainApp`，預設關）。
+- 選單有「開機時自動啟動」（`SMAppService.mainApp`）。**預設開**（2026-11-23 起）：每次啟動若沒註冊就補註冊，使用者在選單關掉才記住不要（`UserDefaults` 的 `launchAtLoginOptOut`）。原因是重開機後主機沒起來，區網與外網都連不上，最容易被忘記。
+- 同時只跑一份：啟動時發現已有同 bundle id 的主機在跑，新的這份自己結束（舊的 System Events 登入項目與 `SMAppService` 同時帶起來時，不會兩份搶 52830 埠）。
 
 ## 擷取與編碼的關鍵設計
 
@@ -38,6 +39,10 @@ macOS App，非沙箱（`ENABLE_APP_SANDBOX = NO`，CGEvent 注入需要）。�
 - 螢幕序號＝`CGGetActiveDisplayList` 排序後的位置：主螢幕排第一，其餘依 `CGDisplayBounds.minX` 由左到右。手機只送序號（`selectDisplay`），主機每次開始或切換串流後回 `displayInfo`。
 - 切換**不斷線**：等舊擷取確實停下（`stopAndWait`，避免舊螢幕影格混進新解析度的編碼器）→ 換 `InputInjector.displayID` 並把實體游標移到新螢幕中央 → 依新螢幕重建編碼器與擷取 → 重送 `helloAck`（手機據此更新桌面大小）。游標回報與補強計時器沿用，不重建。
 - 座標換算、游標回報都以「操控中的螢幕」為準，不再寫死 `CGMainDisplayID()`。
+- **螢幕會在主機跑著時消失**（闔上筆電、拔掉外接螢幕、螢幕睡著），所以操控中的螢幕不能只在啟動時記一次（2026-11-23 起）：
+  - 開始串流時（`beginStreaming`）先叫醒螢幕（`IOPMAssertionDeclareUserActivity`），串流期間持有 `PreventUserIdleDisplaySleep`，斷線時放掉；記住的螢幕不在作用中清單就改用目前的主螢幕；失敗每秒重試，最多 5 次。
+  - 擷取中途停掉（`SCStream` 的 `didStopWithError`）或螢幕配置變了（`NSApplication.didChangeScreenParametersNotification`）且操控中的螢幕不見：停掉舊擷取，換到還在的螢幕重開，流程同切換螢幕（重送 `helloAck`，不斷線）。配置變了但螢幕還在，只重送 `displayInfo`。一分鐘內中斷超過 3 次就放棄。
+  - 都救不回來時送 `hostError`（UTF-8 原因）再等 1 秒斷線，手機顯示原因而不是「連線中斷」。完全沒有作用中的螢幕（筆電闔上又沒接外接螢幕）時沒有東西可以擷取，只能顯示原因。
 
 ## 位元率與 codec 的決策依據
 
@@ -56,6 +61,9 @@ macOS App，非沙箱（`ENABLE_APP_SANDBOX = NO`，CGEvent 注入需要）。�
 - **游標回報**：每 33 ms 檢查實體游標，有變才送；收到手機滑鼠事件後 0.5 秒內不回報，避免主機回報和手機本地游標互相拉扯。
 
 ## ⚠️ 會中招的點
+
+### 手機通過驗證卻「連線中斷」：主機 log 有 `找不到螢幕`
+2026-11-23 外網連不上的真正原因：Tunnel、權限、防火牆都正常，手機也通過驗證，但主機 02:32 啟動時記下的螢幕之後不在了（推測是闔上筆電，作用中只剩兩台外接螢幕），每次開始擷取都回 `找不到螢幕`。查法：`/usr/bin/log show … --predicate 'subsystem == "tw.firstfu.DeskPilotHost"'` 看 `交握：驗證` 之後接什麼。已改成自動換到還在的螢幕（見上方「多螢幕切換」）；注意主機 log 的 subsystem 是 `tw.firstfu.DeskPilotHost`，`tw.firstfu.DeskPilot` 只有連線層的訊息。
 
 ### 缺螢幕錄製權限時，表現是「連上就斷」
 ScreenCaptureKit 會回 `使用者拒絕應用程式、視窗、顯示器擷取的TCC`，主機隨即關掉連線，手機只看到「連線中斷」。**實際上**權限綁在 App 的程式碼簽章上，使用者以為開了、實際上開的可能是別的版本。主機啟動時會跑 `CGPreflightScreenCaptureAccess()` 並寫進 log（`螢幕錄製權限預檢：true/false`），以這個為準；false 時再呼叫 `CGRequestScreenCaptureAccess()` 讓系統把 App 加進設定清單。

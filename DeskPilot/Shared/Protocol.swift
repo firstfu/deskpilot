@@ -68,6 +68,9 @@ enum MessageType: UInt8 {
     case audioFormat = 0x8B
     /// 一包 AAC 聲音資料：payload 為原始 AAC 封包（單一 packet）。靜音時不送。
     case audioFrame = 0x8C
+    /// 主機無法串流、即將斷線的原因（加密）：payload 為 UTF-8 給使用者看的文字。
+    /// 後來加的：舊版手機不認得會略過（照樣只看到斷線），所以不必升協定版本。
+    case hostError = 0x8D
 }
 
 /// `pairResult` 的 payload。2 是後來加的：舊版手機只認 1，其他值一律當拒絕，所以不必升協定版本。
