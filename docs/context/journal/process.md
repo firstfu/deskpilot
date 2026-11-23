@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-23 — 主機記住的螢幕過期導致手機一連上就斷線（`b5027d0`）
+
+- **變更**：`HostController` 收到 hello 時，若記住的 `displayID` 已不在 `activeDisplays()`，改用 `CGMainDisplayID()` 並寫 log「螢幕 N 已不在，改用主螢幕 M」。
+- **為什麼**：使用者回報外網又連不上。Tunnel、cloudflared、埠、防火牆、權限都正常，手機連線有進主機且通過驗證，但主機每次回「無法開始串流：找不到螢幕」就斷線。主機 02:32 啟動時記下主螢幕，之後螢幕配置變了（現在只剩兩台外接 1920×1080，內建螢幕不在清單，推測是闔上筆電），舊編號在 ScreenCaptureKit 找不到。
+- **驗證**：主機 build 成功、重開後在聽 52830、螢幕錄製權限預檢 true。**新檢查尚未用手機實連驗證**；「內建螢幕被闔上」是由現在的螢幕清單推論，當時記的編號沒有 log。
+- **下一步**：手機再連一次確認有畫面；串流進行中螢幕消失（`onStop`）還沒處理；螢幕全睡著時的行為未測。
+
 ### 2026-11-23 — 移除 WireGuard 備援；經 Cloudflare Tunnel 的連線不准首次配對（`8ba0868`）
 
 - **變更**：刪掉整套 WireGuard：`DeskPilotHelper` target、`HelperSupport/`、`Shared/HelperProtocol.swift`、`DeskPilotHost/ExternalAccess/`（自動開埠、可達性、DDNS、QR 配對）、`TunnelRelay`、`scripts/build-wireguard-go.sh`、主機 Info.plist 的 ATS 例外與選單項目；pbxproj 用 xcodeproj gem 移除 target 與三個 build phase。主機新增 `HostController.allowsPairing`：來源是回送位址（cloudflared 轉進來的）就不准配對，回 `pairResult`=2（新增 `PairResultCode`）、1 秒後斷線；手機收到 2 顯示「外網不能做首次配對」，「在外面」預設位址改成空字串。文件：`external-access.md` 改寫成只有 Tunnel，並在最後留一段「已移除：WireGuard」；`overview`／`operations`／`release`／`host`／`client`／`protocol`、根 `CLAUDE.md` 索引、兩份 README、CONTRIBUTING 同步。
