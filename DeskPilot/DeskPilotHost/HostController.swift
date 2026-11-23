@@ -493,6 +493,12 @@ final class HostSession: @unchecked Sendable {
                 return
             }
             self.hello = hello
+            // 主機啟動後螢幕可能換過（闔上筆電、外接螢幕拔插），記住的螢幕不在了就改用目前的主螢幕
+            if !Self.activeDisplays().contains(displayID) {
+                HostController.log.notice("螢幕 \(self.displayID) 已不在，改用主螢幕 \(CGMainDisplayID())")
+                displayID = CGMainDisplayID()
+                injector.displayID = displayID
+            }
             Task { await self.beginStreaming(hello, display: self.displayID) }
         case .input:
             guard let event = try? InputEvent.decode(payload) else { return }
