@@ -39,8 +39,8 @@ final class ClientSession {
     }
 
     /// 省流量模式偏好：自動 = 只有在行動網路等「計量網路」上才開。
-    /// 觸控方式：直接觸控＝點哪裡就點 Mac 的哪裡（預設，參考 Screens 的 Touch Mode、Jump Desktop 的 Standard）；
-    /// 觸控板＝手機當觸控板、游標獨立移動（精細操作時用）。
+    /// 觸控方式：直接觸控＝點哪裡就點 Mac 的哪裡（參考 Screens 的 Touch Mode、Jump Desktop 的 Standard）；
+    /// 觸控板＝手機當觸控板、游標獨立移動（預設：使用者實測後選回觸控板）。
     enum TouchMode: String, CaseIterable {
         case direct, trackpad
         var title: String {
@@ -375,7 +375,7 @@ final class ClientSession {
         link?.send(.setFitResolution, Data([on ? 1 : 0]))
     }
 
-    private(set) var touchMode = TouchMode(rawValue: UserDefaults.standard.string(forKey: "touchMode") ?? "") ?? .direct
+    private(set) var touchMode = TouchMode(rawValue: UserDefaults.standard.string(forKey: "touchMode") ?? "") ?? .trackpad
 
     func setTouchMode(_ m: TouchMode) {
         touchMode = m
