@@ -4,6 +4,14 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-24 — 直接觸控拖動時游標浮在指尖上方，不被手指蓋住（`e8cbef9`）
+
+- **變更**：直接觸控模式下，拖動時（沒放大時游標跟手指、長按後拖曳）游標改成浮在指尖上方 50 pt（`fingerLift`），靠近螢幕底部 50 pt 內線性退回 0，手指滑到最底仍能叫出 Dock；長按拖曳的藍圈一起移上去。點一下仍點手指正下方，不受影響。
+- **為什麼**：使用者回報手機上直接觸控拖動時，游標疊在指尖正下方會被手指蓋住，看不到抓住了什麼。
+- **影響檔案**：`DeskPilot/DeskPilot/RemoteSurfaceView.swift`（新增 `lifted()`）、`docs/context/reference/modules/client.md`。
+- **驗證**：Mac 端沒變動；iOS build 成功並已重新安裝到 iPhone 15 Plus。**尚未實機測試**浮動高度是否合適。
+- **下一步**：使用者在手機上試拖動手感；浮動距離不合適的話調 `fingerLift` 即可。
+
 ### 2026-11-24 — 直接觸控、只看一個視窗、Mac 介面放大（`4132dbf`）
 
 - **變更**：手機端新增觸控方式（直接觸控為預設，觸控板模式保留）；新增 `listWindows`／`selectWindow`／`windowList`／`setFitResolution` 四個訊息，主機可只串流單一視窗（拍整台螢幕、`sourceRect` 裁視窗，座標範圍換成視窗，視窗移動／縮放／關閉會追蹤）；連線期間可把螢幕切到 1280×720（優先 HiDPI，`.forSession`，斷線自動還原）。舊版收到新訊息會略過，沒升協定版本。文件：`client.md`、`host.md`、`protocol.md`。
