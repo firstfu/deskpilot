@@ -16,6 +16,12 @@ iOS App。`ClientSession`（主執行緒狀態）＋ `ClientLink`（自己的序
 - Hello 送的是手機原生像素（從 `UIWindowScene.screen.nativeBounds` 取，轉成寬 ≥ 高）。
 - iOS 27 把 `status`／`flush()`／`enqueue` 標成 deprecated（新 API 是 `AVSampleBufferVideoRenderer.Receiver`，要搭配 render synchronizer），舊 API 仍可用，遷移列在待辦。
 
+## 直接觸控、單一視窗、介面放大（2026-11-24 起，尚未實機測）
+
+- **觸控方式**（`ClientSession.TouchMode`，選單「⋯ › 觸控方式」，存 UserDefaults，**預設直接觸控**）：直接觸控＝點哪裡就點 Mac 的哪裡，參考 Screens 5 的 Touch Mode 與 Jump Desktop 的 Standard。單指拖：放大時平移畫面、沒放大時游標跟著手指；雙指點＝在兩指中點右鍵；雙指滑一律捲動；長按 0.3 秒後拖＝在手指下按住左鍵（手指下出現藍圈）。連點兩下時 0.5 秒內、30 pt 內的第二下沿用第一下的位置，否則兩次換算到桌面可能超過主機判斷雙擊的 8 pt。三指、四指、捏合同觸控板模式。下方「手勢」表是**觸控板模式**。
+- **只看一個視窗**（工具列視窗圖示 → `WindowPicker`）：送 `listWindows` 列清單，選了送 `selectWindow`，畫面大小變了時縮放與平移歸零。自動重連後會先回整個螢幕，連上再自動切回原本的視窗。主機是舊版時清單 3 秒沒回應會提示。機制見 `host.md`「單一視窗」。
+- **Mac 介面放大**（選單，存偏好、每次連線都送 `setFitResolution`）：機制與限制見 `host.md`「解析度配合手機」。
+
 ## 手勢（觸控板模式）
 
 | 手勢 | 動作 |

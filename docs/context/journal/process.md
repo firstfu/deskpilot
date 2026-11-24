@@ -4,6 +4,13 @@
 >
 > **process-archive.md 的讀法**：預設不讀。要回溯時先 Grep 關鍵字（日期、功能名、表名）定位，再用 offset/limit 只讀那一筆，不得整份讀進來。
 
+### 2026-11-24 — 直接觸控、只看一個視窗、Mac 介面放大（`4132dbf`）
+
+- **變更**：手機端新增觸控方式（直接觸控為預設，觸控板模式保留）；新增 `listWindows`／`selectWindow`／`windowList`／`setFitResolution` 四個訊息，主機可只串流單一視窗（拍整台螢幕、`sourceRect` 裁視窗，座標範圍換成視窗，視窗移動／縮放／關閉會追蹤）；連線期間可把螢幕切到 1280×720（優先 HiDPI，`.forSession`，斷線自動還原）。舊版收到新訊息會略過，沒升協定版本。文件：`client.md`、`host.md`、`protocol.md`。
+- **為什麼**：使用者問「app 上的操作能比現在好 100 倍嗎」。症狀根源是 6.1 吋手機塞整個 1920×1080 桌面、又用觸控板模式要先移游標才能點。參考了 Screens 5（Touch Mode／Trackpad Mode）與 Jump Desktop（Standard／Trackpad 手勢設定檔）的文件，並沒有實際操作那兩個 App 的畫面。第 4 項（輔助使用介面列按鈕、語音／AI 指令）使用者決定不做。
+- **驗證**：Mac 與 iOS build 成功，主機已重開、新版已裝到 iPhone 15 Plus；解析度挑選邏輯用腳本乾跑過（兩台都挑 1280×720）。**都還沒實機測**：直接觸控的位置與雙擊、視窗清單與切換與打字、視窗移動縮放的追蹤、解析度切換與還原。
+- **下一步**：使用者在手機上測三項，依結果修；擔心的點：視窗被別的視窗蓋住時拍到蓋住的內容、AX 比對視窗在標題列相同或視窗重疊時可能升錯、切螢幕模式時暫時黑屏。
+
 ### 2026-11-24 — Mac 鎖定時通知手機；關閉這台 Mac 的鎖定密碼（`f2664b8`）
 
 - **變更**：新增 `hostState`(0x8E，bit0＝鎖定)：主機在開始串流與收到 `com.apple.screenIsLocked/Unlocked` 時讀 `CGSSessionScreenIsLocked` 送給手機；手機常駐「Mac 已鎖定」提示，解鎖後提示「Mac 已解鎖」。repo 外：這台 Mac 的「螢幕關閉後需要密碼」改成永不（先把 iPhone 鏡像輸出改成每次都詢問，否則該項被鎖成立即）。文件：`host.md` 新增鎖定畫面打字的雷並把螢幕接回標為已驗證、`client.md`、`protocol.md`、`operations.md`。

@@ -48,6 +48,9 @@
 | 主機→手機 | `audioFormat` (0x8B)／`audioFrame` (0x8C) | 取樣率＋聲道數；之後每個 `audioFrame` 是單一 AAC-LC 封包，靜音時不送 |
 | 主機→手機 | `hostError` (0x8D) | 主機無法串流、即將斷線的原因（UTF-8 給使用者看的文字），送完等 1 秒斷線。後來加的，舊版手機會略過，所以沒升協定版本 |
 | 主機→手機 | `hostState` (0x8E) | 主機狀態 UInt8 位元旗標（`HostStateFlags`，bit0＝Mac 停在鎖定畫面）。開始串流時送一次、狀態變了再送。後來加的，舊版手機會略過，沒升協定版本 |
+| 手機→主機 | `listWindows` (0x0D)／主機→手機 `windowList` (0x8F) | 要 Mac 上可單獨串流的視窗清單；回 `WindowListMessage`（目前視窗 ID＋每個視窗的 ID、App 名、標題），前景的排前面 |
+| 手機→主機 | `selectWindow` (0x0E) | UInt32 視窗 ID，0＝回到整個螢幕。主機切好後重送 `helloAck`（桌面大小＝視窗大小），座標以視窗為準 |
+| 手機→主機 | `setFitResolution` (0x0F) | UInt8：1＝連線期間把串流中的螢幕切到較低解析度（介面放大）、0＝還原。主機切完重送 `helloAck` |
 | 雙向 | `handshake` (0x08)／`handshakeAck` (0x87)／`authFailed` (0x88)／`pairResult` (0x89)／`encrypted` (0x7F) | 見上方「配對與加密」 |
 
 ## ⚠️ 版本要完全相同
