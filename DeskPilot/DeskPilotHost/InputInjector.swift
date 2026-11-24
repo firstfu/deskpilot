@@ -31,20 +31,22 @@ final class InputInjector: @unchecked Sendable {
     /// 正在操控的螢幕；切換螢幕時由工作階段更新。
     var displayID: CGDirectDisplayID = CGMainDisplayID()
 
-    /// 操控中螢幕在全域座標（左上原點，point）中的範圍。
-    private var displayBounds: CGRect { CGDisplayBounds(displayID) }
+    /// 只串流單一視窗時，座標以這個視窗的範圍（全域座標，point）為準；nil＝整個螢幕。
+    var windowFrame: CGRect?
 
-    /// 目前游標位置的正規化座標（給主機回報游標用）。
-    static func currentCursorNormalized(display: CGDirectDisplayID) -> (UInt16, UInt16)? {
-        guard let loc = CGEvent(source: nil)?.location else { return nil }
-        let b = CGDisplayBounds(display)
-        return (NormalizedCoordinate.encode((loc.x - b.minX) / b.width),
-                NormalizedCoordinate.encode((loc.y - b.minY) / b.height))
+    /// 手機座標 0～1 對應的範圍：視窗模式是視窗，平常是操控中的螢幕（全域座標，左上原點，point）。
+    var targetBounds: CGRect { windowFrame ?? CGDisplayBounds(displayID) }
+
+    /// 目前游標位置相對於 `bounds` 的正規化座標（給主機回報游標用）；游標不在範圍內時夾到邊緣。
+    static func currentCursorNormalized(in b: CGRect) -> (UInt16, UInt16)? {
+        guard let loc = CGEvent(source: nil)?.location, b.width > 0, b.height > 0 else { return nil }
+        return (NormalizedCoordinate.encode(min(max((loc.x - b.minX) / b.width, 0), 1)),
+                NormalizedCoordinate.encode(min(max((loc.y - b.minY) / b.height, 0), 1)))
     }
 
     /// 把實體游標移到操控中螢幕的正中央（切換螢幕後，讓手機游標與實際位置一致）。
     func centerCursor() {
-        let b = displayBounds
+        let b = targetBounds
         position = CGPoint(x: b.midX, y: b.midY)
         CGWarpMouseCursorPosition(position)
     }
@@ -53,7 +55,7 @@ final class InputInjector: @unchecked Sendable {
     func handle(_ event: InputEvent) {
         switch event {
         case let .mouseMove(x, y):
-            let b = displayBounds
+            let b = targetBounds
             // 最大值要落在最後一個像素內（maxX - 1）：位置在螢幕外一格時系統不認為游標「頂到邊」，
             // 自動隱藏的 Dock 就叫不出來
             position = CGPoint(x: min(b.minX + NormalizedCoordinate.decode(x) * b.width, b.maxX - 1),

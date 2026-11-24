@@ -39,6 +39,18 @@ final class ClientSession {
     }
 
     /// 省流量模式偏好：自動 = 只有在行動網路等「計量網路」上才開。
+    /// 觸控方式：直接觸控＝點哪裡就點 Mac 的哪裡（預設，參考 Screens 的 Touch Mode、Jump Desktop 的 Standard）；
+    /// 觸控板＝手機當觸控板、游標獨立移動（精細操作時用）。
+    enum TouchMode: String, CaseIterable {
+        case direct, trackpad
+        var title: String {
+            switch self {
+            case .direct: "直接觸控"
+            case .trackpad: "觸控板"
+            }
+        }
+    }
+
     enum SaverPreference: String, CaseIterable {
         case auto, on, off
         var title: String {
@@ -54,6 +66,12 @@ final class ClientSession {
     private(set) var hosts: [DiscoveredHost] = []
     /// 遠端桌面大小（point），用來算長寬比。連上前為 nil。
     private(set) var desktopSize: CGSize?
+    /// Mac 上可單獨串流的視窗（要了才有，nil＝等待中）。
+    private(set) var windowList: WindowListMessage?
+    /// 正在單獨串流的視窗 ID，0＝整個螢幕。
+    private(set) var currentWindow: UInt32 = 0
+    /// 自動重連後要恢復的視窗（新連線的主機一律從整個螢幕開始）。
+    private var pendingWindowRestore: UInt32 = 0
     /// 最近一次向主機要求的畫質（true = 原生解析度），避免重複送。
     private var requestedNativeDetail = false
     /// 主機的螢幕數量與目前操控的螢幕序號（0 起算）。
@@ -171,6 +189,11 @@ final class ClientSession {
                 self.state = .connected(host.name)
                 self.reconnectAttempt = 0
                 self.syncSettingsToHost()
+                if self.pendingWindowRestore != 0 {
+                    let id = self.pendingWindowRestore
+                    self.pendingWindowRestore = 0
+                    self.selectWindow(id)
+                }
             }
         }
         l.onHostClipboard = { [weak self] text in
@@ -182,6 +205,12 @@ final class ClientSession {
                     UIPasteboard.general.string = text
                     self.showToast("已拷貝到手機剪貼簿")
                 }
+            }
+        }
+        l.onWindowList = { [weak self] list in
+            Task { @MainActor in
+                self?.windowList = list
+                self?.currentWindow = list.current
             }
         }
         l.onHostState = { [weak self] flags in
@@ -219,7 +248,10 @@ final class ClientSession {
                 self.statsTimer?.invalidate()
                 self.statsTimer = nil
                 // 沒被明確拒絕的中斷（切換網路、手機睡眠、Wi-Fi 閃斷）自動重連，不必回清單重點
+                self.pendingWindowRestore = self.currentWindow
+                self.currentWindow = 0
                 if self.rejection == nil, self.desktopSize != nil, self.lastHost != nil, self.scheduleReconnect() { return }
+                self.pendingWindowRestore = 0
                 self.desktopSize = nil
                 self.state = .failed(self.rejection ?? "連線中斷")
                 self.rejection = nil
@@ -318,6 +350,38 @@ final class ClientSession {
 
     // MARK: 省流量與聲音
 
+    // MARK: 單一視窗
+
+    /// 向主機要視窗清單；結果放在 `windowList`。
+    func requestWindowList() {
+        windowList = nil
+        link?.send(.listWindows, Data())
+    }
+
+    /// 只串流這個視窗（0＝回到整個螢幕）。主機切好後會送新的 helloAck，畫面大小跟著換。
+    func selectWindow(_ id: UInt32) {
+        currentWindow = id
+        var w = ByteWriter()
+        w.u32(id)
+        link?.send(.selectWindow, w.data)
+    }
+
+    /// 連線期間讓 Mac 改用較低解析度，介面在手機上放大（存偏好，每次連線都套用）。
+    private(set) var fitResolution = UserDefaults.standard.bool(forKey: "fitResolution")
+
+    func setFitResolution(_ on: Bool) {
+        fitResolution = on
+        UserDefaults.standard.set(on, forKey: "fitResolution")
+        link?.send(.setFitResolution, Data([on ? 1 : 0]))
+    }
+
+    private(set) var touchMode = TouchMode(rawValue: UserDefaults.standard.string(forKey: "touchMode") ?? "") ?? .direct
+
+    func setTouchMode(_ m: TouchMode) {
+        touchMode = m
+        UserDefaults.standard.set(m.rawValue, forKey: "touchMode")
+    }
+
     func setSaverPreference(_ p: SaverPreference) {
         saverPreference = p
         UserDefaults.standard.set(p.rawValue, forKey: "saverPreference")
@@ -356,6 +420,8 @@ final class ClientSession {
             link.setAudioPlayback(true)
             link.send(.setAudio, Data([1]))
         }
+        // 主機已經是開的話會忽略，不會因為改解析度後重送的 helloAck 而一直重來
+        if fitResolution { link.send(.setFitResolution, Data([1])) }
     }
 
     private func startPathMonitor() {
@@ -478,6 +544,7 @@ final class ClientLink: @unchecked Sendable {
     var onDisplayInfo: ((DisplayInfoMessage) -> Void)?
     var onHostClipboard: ((String) -> Void)?
     var onHostState: ((UInt8) -> Void)?
+    var onWindowList: ((WindowListMessage) -> Void)?
     /// 聲音播放器；開啟聲音後收到格式才建立。只在 `queue` 上存取。
     private var audioPlayer: AudioPlayer?
     private var audioPlaybackWanted = false
@@ -678,6 +745,8 @@ final class ClientLink: @unchecked Sendable {
             onHostClipboard?(String(data: payload, encoding: .utf8) ?? "")
         case .hostState:
             if let flags = payload.first { onHostState?(flags) }
+        case .windowList:
+            if let list = try? WindowListMessage.decode(payload) { onWindowList?(list) }
         case .hostError:
             // 主機說明為什麼要斷線（例如沒有可擷取的螢幕）；記成拒絕原因，斷線時顯示這段而不是「連線中斷」
             let reason = String(data: payload, encoding: .utf8) ?? ""

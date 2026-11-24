@@ -120,6 +120,7 @@ struct RemoteScreen: View {
     @State private var keyboardVisible = false
     @State private var showShortcuts = false
     @State private var showStats = true
+    @State private var showWindows = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -130,6 +131,10 @@ struct RemoteScreen: View {
                 HStack(spacing: 8) {
                     if session.displayCount > 1 {
                         toolButton("display.2", active: false) { session.cycleDisplay() }
+                    }
+                    toolButton("macwindow", active: session.currentWindow != 0) {
+                        session.requestWindowList()
+                        showWindows = true
                     }
                     toolButton("keyboard", active: keyboardVisible) { keyboardVisible.toggle() }
                     toolButton("command", active: showShortcuts || !session.armedModifiers.isEmpty) { showShortcuts.toggle() }
@@ -152,6 +157,10 @@ struct RemoteScreen: View {
                 }
             }
             .padding(10)
+        }
+        .sheet(isPresented: $showWindows) {
+            WindowPicker(session: session) { showWindows = false }
+                .presentationDetents([.medium, .large])
         }
         // 快捷鍵列放在底部：鍵盤出現時 SwiftUI 會自動把它推到鍵盤上方
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -195,9 +204,19 @@ struct RemoteScreen: View {
                 Label(session.audioEnabled ? "聲音：開（點一下關閉）" : "聲音：關（點一下開啟）",
                       systemImage: session.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash")
             }
+            Picker("觸控方式", selection: Binding(get: { session.touchMode },
+                                                  set: { session.setTouchMode($0) })) {
+                ForEach(ClientSession.TouchMode.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
             Picker("省流量模式", selection: Binding(get: { session.saverPreference },
                                                     set: { session.setSaverPreference($0) })) {
                 ForEach(ClientSession.SaverPreference.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            Button {
+                session.setFitResolution(!session.fitResolution)
+            } label: {
+                Label(session.fitResolution ? "Mac 介面放大：開（點一下還原）" : "Mac 介面放大：關（點一下開啟）",
+                      systemImage: "textformat.size")
             }
             Toggle(isOn: $showStats) { Label("顯示統計", systemImage: "chart.bar") }
             Button { Task { await session.runBenchmark() } } label: {
@@ -239,5 +258,71 @@ struct RemoteScreen: View {
                 .background(active ? Color.white : Color.black.opacity(0.55), in: Circle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// 選要單獨串流的 Mac 視窗。手機螢幕塞整個桌面字太小，只看一個視窗時字會大好幾倍、也不用一直平移。
+/// 選了之後主機把那個 App 帶到前景，畫面只剩這個視窗；選「整個螢幕」回到原本的桌面。
+struct WindowPicker: View {
+    let session: ClientSession
+    let dismiss: () -> Void
+    @State private var timedOut = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    row(icon: "rectangle.on.rectangle", title: "整個螢幕", subtitle: nil, id: 0)
+                }
+                if let list = session.windowList {
+                    if list.items.isEmpty {
+                        Text("Mac 上沒有可以單獨顯示的視窗").foregroundStyle(.secondary)
+                    } else {
+                        Section("視窗（前面的在最上層）") {
+                            ForEach(list.items) { item in
+                                row(icon: "macwindow", title: item.app,
+                                    subtitle: item.title.isEmpty ? nil : item.title, id: item.id)
+                            }
+                        }
+                    }
+                } else if timedOut {
+                    Text("Mac 沒有回應，Mac 上的 DeskPilot 可能是舊版").foregroundStyle(.secondary)
+                } else {
+                    HStack { ProgressView(); Text("讀取視窗清單…").foregroundStyle(.secondary) }
+                }
+            }
+            .navigationTitle("要看哪個視窗")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("關閉", action: dismiss) }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { timedOut = false; session.requestWindowList() } label: { Image(systemName: "arrow.clockwise") }
+                }
+            }
+            .task(id: session.windowList == nil) {
+                guard session.windowList == nil else { return }
+                try? await Task.sleep(for: .seconds(3))
+                if session.windowList == nil { timedOut = true }
+            }
+        }
+    }
+
+    private func row(icon: String, title: String, subtitle: String?, id: UInt32) -> some View {
+        Button {
+            if id != session.currentWindow { session.selectWindow(id) }
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon).frame(width: 24).foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).foregroundStyle(.primary)
+                    if let subtitle {
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer()
+                if id == session.currentWindow { Image(systemName: "checkmark").foregroundStyle(.tint) }
+            }
+        }
     }
 }

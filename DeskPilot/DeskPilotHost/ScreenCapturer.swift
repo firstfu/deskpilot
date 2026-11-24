@@ -31,13 +31,32 @@ final class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     ///   - width: 輸出像素寬
     ///   - height: 輸出像素高
     /// - Throws: 沒有螢幕錄製權限或找不到螢幕時拋出 ScreenCaptureKit 的錯誤。
-    func start(displayID: CGDirectDisplayID, width: Int, height: Int, fps: Int = 60, audio: Bool = false) async throws {
+    ///   - crop: 只拍螢幕上的這一塊（螢幕本地座標，point）；單一視窗模式用。用裁切而不是只拍視窗本身，
+    ///     蓋在視窗上的右鍵選單、下拉選單等彈出視窗才拍得到。
+    func start(displayID: CGDirectDisplayID, crop: CGRect? = nil, width: Int, height: Int, fps: Int = 60, audio: Bool = false) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
             throw NSError(domain: "DeskPilot", code: 1, userInfo: [NSLocalizedDescriptionKey: "找不到螢幕"])
         }
+        // 測試用：環境變數 DESKPILOT_EXCLUDE_BUNDLES（逗號分隔 bundle id）指定的 App 不擷取。
+        // 用模擬器當用戶端時必須排除模擬器，否則它顯示串流畫面 → 被擷取 → 再串流，形成無限迴圈，量不到真實數字
+        let excludedIDs = Set((ProcessInfo.processInfo.environment["DESKPILOT_EXCLUDE_BUNDLES"] ?? "")
+            .split(separator: ",").map(String.init))
+        let excludedApps = content.applications.filter { excludedIDs.contains($0.bundleIdentifier) }
+        let filter = SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
+        try await run(filter: filter, crop: crop, width: width, height: height, fps: fps, audio: audio)
+    }
 
+    /// 視窗移動時改裁切範圍，不必重開擷取。
+    func setCrop(_ crop: CGRect) async throws {
+        guard let stream, let config else { return }
+        config.sourceRect = crop
+        try await stream.updateConfiguration(config)
+    }
+
+    private func run(filter: SCContentFilter, crop: CGRect?, width: Int, height: Int, fps: Int, audio: Bool) async throws {
         let config = SCStreamConfiguration()
+        if let crop { config.sourceRect = crop }
         config.width = width
         config.height = height
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
@@ -54,12 +73,6 @@ final class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         // 佇列太深會增加延遲，太淺編碼器忙時會掉幀；靜止補強會長期持有一張，所以比最低值 3 多留一格
         config.queueDepth = 4
 
-        // 測試用：環境變數 DESKPILOT_EXCLUDE_BUNDLES（逗號分隔 bundle id）指定的 App 不擷取。
-        // 用模擬器當用戶端時必須排除模擬器，否則它顯示串流畫面 → 被擷取 → 再串流，形成無限迴圈，量不到真實數字
-        let excludedIDs = Set((ProcessInfo.processInfo.environment["DESKPILOT_EXCLUDE_BUNDLES"] ?? "")
-            .split(separator: ",").map(String.init))
-        let excludedApps = content.applications.filter { excludedIDs.contains($0.bundleIdentifier) }
-        let filter = SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)

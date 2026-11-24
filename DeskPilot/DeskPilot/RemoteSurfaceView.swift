@@ -3,7 +3,11 @@
 //  DeskPilot（iOS 用戶端）
 //
 //  遠端桌面操作面：顯示影像、本地繪製游標、把手勢轉成滑鼠／鍵盤事件。
-//  手感設計（觸控板模式）：
+//  兩種觸控方式（`ClientSession.TouchMode`）：
+//  直接觸控（預設）：點哪裡就點 Mac 的哪裡；單指拖：放大時平移畫面、沒放大時游標跟著手指；
+//  雙指點＝在兩指中點右鍵；雙指滑＝捲動；長按後拖＝在手指下按住左鍵拖曳（手指下出現藍圈）。
+//  三指、四指、捏合與下方觸控板模式相同。
+//  觸控板模式：
 //  - 單指滑動：移動游標（有加速度，慢移精準、快移遠）
 //  - 單指點一下：左鍵；連點兩下就是雙擊（主機依時間判定，手機端不必等待，零延遲）
 //  - 雙指點一下：右鍵
@@ -29,10 +33,12 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
     private let session: ClientSession
     private let videoView = VideoLayerView()
     private let cursorLayer = CAShapeLayer()
+    private let dragIndicator = CAShapeLayer()
     let keyboardField = KeyboardField()
 
     /// 本地縮放倍率（1 = 整個桌面塞進螢幕）。
     private var zoom: CGFloat = 1
+    private var lastDesktopSize: CGSize?
     /// 縮放後畫面相對「置中適配位置」的位移。
     private var pan = CGPoint.zero
     private var pinchActive = false
@@ -40,6 +46,8 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
     private var moveStartTime: CFTimeInterval = 0
     private var scrollRemainder = CGPoint.zero
     private var lastDragLocation = CGPoint.zero
+    private var lastTapTime: CFTimeInterval = 0
+    private var lastTapPoint = CGPoint.zero
     /// 游標是否已貼在桌面邊緣；進入邊緣的那一刻震動一下，之後不重複。
     private var cursorAtEdge = false
     private let clickHaptic = UIImpactFeedbackGenerator(style: .light)
@@ -67,6 +75,13 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
         cursorLayer.shadowRadius = 2
         cursorLayer.shadowOffset = CGSize(width: 0, height: 1)
         layer.addSublayer(cursorLayer)
+
+        dragIndicator.path = UIBezierPath(ovalIn: CGRect(x: -22, y: -22, width: 44, height: 44)).cgPath
+        dragIndicator.fillColor = UIColor.systemBlue.withAlphaComponent(0.25).cgColor
+        dragIndicator.strokeColor = UIColor.systemBlue.cgColor
+        dragIndicator.lineWidth = 2
+        dragIndicator.isHidden = true
+        layer.addSublayer(dragIndicator)
 
         keyboardField.session = session
         keyboardField.frame = CGRect(x: 0, y: -100, width: 10, height: 10)
@@ -117,6 +132,12 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
     }
 
     func applyLayout() {
+        // 畫面換了大小（切換視窗、整個螢幕、換螢幕）：縮放與平移歸零，從整個畫面重新開始
+        if session.desktopSize != lastDesktopSize {
+            lastDesktopSize = session.desktopSize
+            zoom = 1
+            pan = .zero
+        }
         clampPan()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -184,10 +205,10 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
         pinch.delegate = self
         addGestureRecognizer(pinch)
 
-        let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
+        let tap = UITapGestureRecognizer(target: self, action: #selector(onTap(_:)))
         addGestureRecognizer(tap)
 
-        let rightTap = UITapGestureRecognizer(target: self, action: #selector(onRightTap))
+        let rightTap = UITapGestureRecognizer(target: self, action: #selector(onRightTap(_:)))
         rightTap.numberOfTouchesRequired = 2
         addGestureRecognizer(rightTap)
 
@@ -202,6 +223,22 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
             || (g is UIPanGestureRecognizer && other is UIPinchGestureRecognizer)
     }
 
+    private var isDirect: Bool { session.touchMode == .direct }
+
+    /// 手機畫面上的一點對應到桌面的正規化座標（超出桌面的部分夾到邊緣，所以點黑邊＝點桌面邊緣）。
+    private func desktopPoint(_ p: CGPoint) -> CGPoint {
+        let r = displayRect
+        guard r.width > 0, r.height > 0 else { return session.cursor }
+        return CGPoint(x: min(max((p.x - r.minX) / r.width, 0), 1), y: min(max((p.y - r.minY) / r.height, 0), 1))
+    }
+
+    /// 直接觸控：游標跳到手指底下。
+    private func moveCursor(toView p: CGPoint) {
+        session.moveCursor(to: desktopPoint(p))
+        notifyEdgeIfNeeded()
+        updateCursorLayer()
+    }
+
     @objc private func onMove(_ g: UIPanGestureRecognizer) {
         if g.state == .began { moveStartTime = CACurrentMediaTime() }
         guard g.state == .changed else { return }
@@ -209,6 +246,17 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
         guard CACurrentMediaTime() - moveStartTime > 0.08 else { return }
         let t = g.translation(in: self)
         g.setTranslation(.zero, in: self)
+        if isDirect {
+            // 直接觸控：放大時單指拖動畫面（同 Jump Desktop Standard）；沒放大時游標跟著手指走（懸停，滑到最底可叫出 Dock）
+            if zoom > 1 {
+                pan.x += t.x
+                pan.y += t.y
+                applyLayout()
+            } else {
+                moveCursor(toView: g.location(in: self))
+            }
+            return
+        }
         let v = g.velocity(in: self)
         // 指標加速：慢速 1 倍精準點選，快速最多 3 倍一次跨過螢幕
         let speed = hypot(v.x, v.y)
@@ -249,7 +297,8 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
 
     /// 手勢開始時決定這次是平移還是捲動，中途捏合改變縮放也不換，避免一次手勢做兩件事。
     @objc private func onTwoFingerPan(_ g: UIPanGestureRecognizer) {
-        if g.state == .began { twoFingerPansView = zoom > 1 }
+        // 直接觸控時單指已負責平移畫面，雙指一律捲動
+        if g.state == .began { twoFingerPansView = zoom > 1 && !isDirect }
         guard twoFingerPansView else { return onScroll(g) }
         guard g.state == .changed else { return }
         let t = g.translation(in: self)
@@ -302,18 +351,60 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
         }
     }
 
-    @objc private func onTap() {
+    @objc private func onTap(_ g: UITapGestureRecognizer) {
+        if isDirect {
+            let p = g.location(in: self)
+            let now = CACurrentMediaTime()
+            // 連點兩下時手指位置會差幾 point，換算到桌面可能超過主機判定雙擊的距離（8 pt），
+            // 所以 0.5 秒內、30 pt 內的第二下沿用上一下的位置
+            let isRepeat = now - lastTapTime < 0.5 && hypot(p.x - lastTapPoint.x, p.y - lastTapPoint.y) < 30
+            if !isRepeat { moveCursor(toView: p); lastTapPoint = p }
+            lastTapTime = now
+        }
         clickHaptic.impactOccurred()
         session.click(.left)
     }
 
-    @objc private func onRightTap() {
+    @objc private func onRightTap(_ g: UITapGestureRecognizer) {
+        // 雙指點：以兩指中點為位置
+        if isDirect { moveCursor(toView: g.location(in: self)) }
         rightClickHaptic.impactOccurred()
         session.click(.right)
     }
 
+    /// 拖曳中在手指下畫一個圈，讓人知道已經按住了（參考 Screens 的藍色指示器）。
+    private func showDragIndicator(at p: CGPoint?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if let p {
+            dragIndicator.position = p
+            dragIndicator.isHidden = false
+        } else {
+            dragIndicator.isHidden = true
+        }
+        CATransaction.commit()
+    }
+
     @objc private func onDrag(_ g: UILongPressGestureRecognizer) {
         let loc = g.location(in: self)
+        if isDirect {
+            switch g.state {
+            case .began:
+                moveCursor(toView: loc)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                showDragIndicator(at: loc)
+                session.send(.mouseButton(.left, down: true))
+            case .changed:
+                moveCursor(toView: loc)
+                showDragIndicator(at: loc)
+                followCursor()
+                applyLayout()
+            default:
+                showDragIndicator(at: nil)
+                session.send(.mouseButton(.left, down: false))
+            }
+            return
+        }
         switch g.state {
         case .began:
             lastDragLocation = loc

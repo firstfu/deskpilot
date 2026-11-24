@@ -13,6 +13,7 @@ import IOKit.pwr_mgt
 import Network
 import Observation
 import os
+import ScreenCaptureKit
 
 @MainActor
 @Observable
@@ -303,6 +304,23 @@ final class HostSession: @unchecked Sendable {
     /// 手機回報的顯示區大小與目前操控的螢幕（工作階段佇列／beginStreaming 內使用）。
     private var hello: HelloMessage?
     private var displayID = CGMainDisplayID()
+    /// 只串流單一視窗時的目標；nil＝整個螢幕。
+    private struct WindowTarget {
+        var id: CGWindowID
+        /// 全域座標（左上原點，point）。
+        var frame: CGRect
+        /// 視窗所在螢幕的像素／point 比。
+        var scale: CGFloat
+    }
+    private var window: WindowTarget?
+    /// 每 0.5 秒檢查視窗有沒有移動、縮放或關掉。
+    private var windowTimer: DispatchSourceTimer?
+    /// 視窗大小變了、等下一次檢查確認穩定才重開擷取（拖曳縮放時不會每 0.5 秒重開一次）。
+    private var pendingWindowSize: CGSize?
+    /// 手機要求「解析度配合手機」。
+    private var fitResolution = false
+    /// 被改過解析度的螢幕與它原本的模式；還原時用。
+    private let originalMode = OSAllocatedUnfairLock<(display: CGDirectDisplayID, mode: CGDisplayMode)?>(initialState: nil)
     private var switching = false
     /// 擷取中斷後正在接回（只在 `queue` 上存取）。
     private var recovering = false
@@ -548,8 +566,30 @@ final class HostSession: @unchecked Sendable {
         case .setAudio:
             guard let v = payload.first else { return }
             Task { await self.applyAudio(v == 1) }
+        case .setFitResolution:
+            guard let v = payload.first, let hello, !switching, !recovering, (v == 1) != fitResolution else { return }
+            fitResolution = v == 1
+            switching = true
+            Task {
+                await self.applyFitResolution(hello: hello)
+                self.queue.async { self.switching = false }
+            }
         case .clipboard:
             handleClipboard(payload)
+        case .listWindows:
+            let current = window?.id ?? 0
+            Task {
+                let items = await Self.windowList()
+                self.framed.send(.windowList, WindowListMessage(current: current, items: items).encode())
+            }
+        case .selectWindow:
+            var r = ByteReader(payload)
+            guard let id = try? r.u32(), !switching, !recovering, let hello else { return }
+            switching = true
+            Task {
+                await self.switchWindow(to: id == 0 ? nil : id, hello: hello)
+                self.queue.async { self.switching = false }
+            }
         case .selectDisplay:
             guard let index = payload.first.map(Int.init) else { return }
             let list = Self.activeDisplays()
@@ -579,7 +619,7 @@ final class HostSession: @unchecked Sendable {
         saver.withLock { $0 = on }
         HostController.log.notice("省流量模式：\(on ? "開" : "關", privacy: .public)")
         encoder?.setBitrate(targetBitrate)
-        if let geo = hello.map({ Self.geometry(display: displayID, native: nativeDetail, hello: $0) }) {
+        if let geo = hello.map({ geometry(native: nativeDetail, hello: $0) }) {
             try? await capturer.reconfigure(width: geo.width, height: geo.height, fps: on ? 30 : 60)
         }
         queue.async { self.requestDetail(self.wantsNative && !on) }
@@ -653,6 +693,12 @@ final class HostSession: @unchecked Sendable {
     private func switchDisplay(to display: CGDirectDisplayID, hello: HelloMessage) async {
         await capturer.stopAndWait()
         lastFrame.withLock { $0 = nil }
+        useWindow(nil)
+        // 解析度配合手機只套在正在看的那台：舊的還原、新的改小
+        if fitResolution {
+            Self.restoreMode(originalMode)
+            if Self.applyFitMode(display, saving: originalMode) { try? await Task.sleep(for: .milliseconds(800)) }
+        }
         useDisplay(display)
         injector.centerCursor()
         lastCursor = nil
@@ -663,6 +709,229 @@ final class HostSession: @unchecked Sendable {
     private func useDisplay(_ display: CGDirectDisplayID) {
         displayID = display
         injector.displayID = display
+    }
+
+    private func useWindow(_ w: WindowTarget?) {
+        window = w
+        injector.windowFrame = w?.frame
+        pendingWindowSize = nil
+    }
+
+    // MARK: 解析度配合手機
+
+    /// 依 `fitResolution` 把目前螢幕切到較低解析度或還原，然後重開擷取（重送 helloAck，手機更新桌面大小）。
+    private func applyFitResolution(hello: HelloMessage) async {
+        let changed = fitResolution ? Self.applyFitMode(displayID, saving: originalMode) : Self.restoreMode(originalMode)
+        guard changed else { return }
+        // 螢幕換模式要一點時間，等它穩定再重開擷取
+        try? await Task.sleep(for: .milliseconds(800))
+        await capturer.stopAndWait()
+        lastFrame.withLock { $0 = nil }
+        lastCursor = nil
+        await beginStreaming(hello, display: displayID)
+    }
+
+    /// 挑一個跟目前比例相同、寬度最接近 1280 point 的模式（介面約放大 1.5 倍；手機橫放約 900 point 寬，再小 Mac 的視窗會塞不下），
+    /// 同寬優先選 HiDPI（像素是 point 的兩倍，字比較銳利）。用 `.forSession` 套用：主機程式結束時系統會自動還原。
+    private static func applyFitMode(_ display: CGDirectDisplayID, saving original: OSAllocatedUnfairLock<(display: CGDirectDisplayID, mode: CGDisplayMode)?>) -> Bool {
+        guard let current = CGDisplayCopyDisplayMode(display), current.height > 0 else { return false }
+        let aspect = Double(current.width) / Double(current.height)
+        let opts = [kCGDisplayShowDuplicateLowResolutionModes: true] as CFDictionary
+        let modes = (CGDisplayCopyAllDisplayModes(display, opts) as? [CGDisplayMode] ?? []).filter {
+            $0.isUsableForDesktopGUI() && $0.height > 0
+                && abs(Double($0.width) / Double($0.height) - aspect) < 0.02
+                && $0.width >= 960 && $0.width < current.width
+        }
+        func score(_ m: CGDisplayMode) -> Double {
+            Double(abs(m.width - 1280)) - (m.pixelWidth > m.width ? 0.5 : 0) - (m.refreshRate == current.refreshRate ? 0.1 : 0)
+        }
+        guard let target = modes.min(by: { score($0) < score($1) }) else {
+            HostController.log.notice("螢幕 \(display, privacy: .public) 沒有比目前小的同比例模式，不改解析度")
+            return false
+        }
+        // 已經改過（例如換螢幕前）就不覆蓋原本記住的模式
+        original.withLock { saved in if saved == nil { saved = (display, current) } }
+        let ok = setMode(target, on: display)
+        HostController.log.notice("解析度配合手機：\(current.width, privacy: .public)×\(current.height, privacy: .public) → \(target.width, privacy: .public)×\(target.height, privacy: .public)（像素 \(target.pixelWidth, privacy: .public)×\(target.pixelHeight, privacy: .public)）\(ok ? "" : "失敗", privacy: .public)")
+        if !ok { original.withLock { $0 = nil } }
+        return ok
+    }
+
+    /// 還原被改過的解析度；沒改過回 false。
+    @discardableResult
+    private static func restoreMode(_ original: OSAllocatedUnfairLock<(display: CGDirectDisplayID, mode: CGDisplayMode)?>) -> Bool {
+        guard let saved = original.withLock({ s -> (display: CGDirectDisplayID, mode: CGDisplayMode)? in defer { s = nil }; return s }) else { return false }
+        let ok = setMode(saved.mode, on: saved.display)
+        HostController.log.notice("還原螢幕 \(saved.display, privacy: .public) 解析度 \(saved.mode.width, privacy: .public)×\(saved.mode.height, privacy: .public)\(ok ? "" : " 失敗", privacy: .public)")
+        return ok
+    }
+
+    private static func setMode(_ mode: CGDisplayMode, on display: CGDirectDisplayID) -> Bool {
+        var config: CGDisplayConfigRef?
+        guard CGBeginDisplayConfiguration(&config) == .success, let config else { return false }
+        guard CGConfigureDisplayWithDisplayMode(config, display, mode, nil) == .success else {
+            CGCancelDisplayConfiguration(config)
+            return false
+        }
+        return CGCompleteDisplayConfiguration(config, .forSession) == .success
+    }
+
+    // MARK: 單一視窗模式
+
+    /// 改成只串流一個視窗（nil＝回到整個螢幕）：把那個 App 帶到前景、視窗升到最上層，游標移到視窗中央，再重開擷取。
+    private func switchWindow(to id: CGWindowID?, hello: HelloMessage) async {
+        if let id {
+            guard let info = Self.windowInfo(id), let windowDisplay = Self.display(at: info.frame) else {
+                HostController.log.notice("要切換的視窗 \(id, privacy: .public) 已不在")
+                return
+            }
+            await capturer.stopAndWait()
+            lastFrame.withLock { $0 = nil }
+            Self.bringToFront(pid: info.pid, frame: info.frame)
+            useDisplay(windowDisplay)
+            useWindow(WindowTarget(id: id, frame: info.frame, scale: Self.scale(of: windowDisplay)))
+            HostController.log.notice("只串流視窗 \(id, privacy: .public)（\(info.app, privacy: .public)）")
+        } else {
+            await capturer.stopAndWait()
+            lastFrame.withLock { $0 = nil }
+            useWindow(nil)
+            HostController.log.notice("回到整個螢幕")
+        }
+        injector.centerCursor()
+        lastCursor = nil
+        await beginStreaming(hello, display: displayID)
+        queue.async { self.startWindowTracking() }
+    }
+
+    /// 視窗模式下追蹤視窗：移動只更新座標範圍（擷取本來就跟著視窗）；大小變了且穩定才重開擷取；關掉了就回到整個螢幕。
+    private func startWindowTracking() {
+        guard windowTimer == nil else { return }
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 0.5, repeating: .milliseconds(500))
+        t.setEventHandler { [weak self] in self?.checkWindow() }
+        t.resume()
+        windowTimer = t
+    }
+
+    private func checkWindow() {
+        guard let w = window, !switching, !recovering, let hello else { return }
+        guard let info = Self.windowInfo(w.id) else {
+            recoverCapture("視窗 \(w.id) 關掉了")
+            return
+        }
+        let size = info.frame.size
+        if abs(size.width - w.frame.width) < 1, abs(size.height - w.frame.height) < 1 {
+            pendingWindowSize = nil
+            if info.frame.origin != w.frame.origin {
+                // 移到別台螢幕就整個重開；同一台只改裁切範圍
+                guard Self.display(at: info.frame) == displayID else {
+                    recoverCapture("視窗移到別的螢幕")
+                    return
+                }
+                window?.frame = info.frame
+                injector.windowFrame = info.frame
+                let crop = Self.localRect(info.frame, on: displayID)
+                Task { try? await self.capturer.setCrop(crop) }
+            }
+            return
+        }
+        // 大小變了：等下一次檢查大小沒再變（拖曳縮放結束）才重開擷取，並重送 helloAck 讓手機更新比例
+        guard let pending = pendingWindowSize, abs(pending.width - size.width) < 1, abs(pending.height - size.height) < 1 else {
+            pendingWindowSize = size
+            return
+        }
+        pendingWindowSize = nil
+        HostController.log.notice("視窗大小改成 \(Int(size.width), privacy: .public)×\(Int(size.height), privacy: .public)，重開擷取")
+        switching = true
+        Task {
+            await capturer.stopAndWait()
+            lastFrame.withLock { $0 = nil }
+            await beginStreaming(hello, display: displayID)
+            queue.async { self.switching = false }
+        }
+    }
+
+    /// 視窗目前的位置與擁有者；視窗關掉或不在畫面上時回 nil。
+    /// 位置裁在視窗中心所在的螢幕內：超出螢幕的部分拍不到，座標範圍也要跟著一致。
+    private static func windowInfo(_ id: CGWindowID) -> (frame: CGRect, pid: pid_t, app: String)? {
+        guard let list = CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]],
+              let info = list.first,
+              (info[kCGWindowIsOnscreen as String] as? Bool) == true,
+              let boundsDict = info[kCGWindowBounds as String] as? NSDictionary,
+              let raw = CGRect(dictionaryRepresentation: boundsDict),
+              let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+              let display = display(at: raw) else { return nil }
+        let frame = raw.intersection(CGDisplayBounds(display))
+        guard frame.width >= 1, frame.height >= 1 else { return nil }
+        return (frame, pid, info[kCGWindowOwnerName as String] as? String ?? "")
+    }
+
+    /// 視窗中心所在的螢幕。
+    private static func display(at frame: CGRect) -> CGDirectDisplayID? {
+        var id: CGDirectDisplayID = 0
+        var count: UInt32 = 0
+        CGGetDisplaysWithPoint(CGPoint(x: frame.midX, y: frame.midY), 1, &id, &count)
+        return count > 0 ? id : nil
+    }
+
+    /// 螢幕的像素／point 比（Retina 是 2）。
+    private static func scale(of display: CGDirectDisplayID) -> CGFloat {
+        guard let mode = CGDisplayCopyDisplayMode(display), mode.width > 0 else { return 1 }
+        return CGFloat(mode.pixelWidth) / CGFloat(mode.width)
+    }
+
+    /// 全域座標的矩形換成該螢幕的本地座標（`sourceRect` 用），並裁在螢幕範圍內。
+    private static func localRect(_ r: CGRect, on display: CGDirectDisplayID) -> CGRect {
+        let b = CGDisplayBounds(display)
+        return r.intersection(b).offsetBy(dx: -b.minX, dy: -b.minY)
+    }
+
+    /// 可以單獨串流的視窗：一般層級、夠大、不是自己；依前後順序排（最前面的在前）。
+    private static func windowList() async -> [WindowListMessage.Item] {
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true) else { return [] }
+        let order = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+            .compactMap { $0[kCGWindowNumber as String] as? CGWindowID }
+        let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        let me = Bundle.main.bundleIdentifier
+        let candidates: [SCWindow] = content.windows.filter { w in
+            guard w.windowLayer == 0, w.frame.width >= 120, w.frame.height >= 80,
+                  let app = w.owningApplication, app.bundleIdentifier != me else { return false }
+            return true
+        }
+        let sorted = candidates.sorted { a, b in
+            let ra: Int = rank[a.windowID] ?? Int.max
+            let rb: Int = rank[b.windowID] ?? Int.max
+            return ra < rb
+        }
+        return sorted.map { w in
+            WindowListMessage.Item(id: w.windowID, app: w.owningApplication?.applicationName ?? "", title: w.title ?? "")
+        }
+    }
+
+    /// 把 App 帶到前景並把指定視窗升到最上層（打字才會進到這個視窗）。視窗用位置與大小比對。
+    private static func bringToFront(pid: pid_t, frame: CGRect) {
+        DispatchQueue.main.async { _ = NSRunningApplication(processIdentifier: pid)?.activate() }
+        let app = AXUIElementCreateApplication(pid)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { return }
+        for w in windows {
+            var posRef: CFTypeRef?
+            var sizeRef: CFTypeRef?
+            var pos = CGPoint.zero
+            var size = CGSize.zero
+            guard AXUIElementCopyAttributeValue(w, kAXPositionAttribute as CFString, &posRef) == .success,
+                  AXUIElementCopyAttributeValue(w, kAXSizeAttribute as CFString, &sizeRef) == .success,
+                  let posRef, let sizeRef,
+                  AXValueGetValue(posRef as! AXValue, .cgPoint, &pos),
+                  AXValueGetValue(sizeRef as! AXValue, .cgSize, &size) else { continue }
+            if abs(pos.x - frame.minX) < 2, abs(pos.y - frame.minY) < 2,
+               abs(size.width - frame.width) < 2, abs(size.height - frame.height) < 2 {
+                AXUIElementPerformAction(w, kAXRaiseAction as CFString)
+                AXUIElementSetAttributeValue(w, kAXMainAttribute as CFString, kCFBooleanTrue)
+                return
+            }
+        }
     }
 
     /// 這次該擷取的螢幕：指定的或記住的還在就用它，不在了（闔上筆電、拔掉外接螢幕）就改用目前的主螢幕；
@@ -747,11 +1016,18 @@ final class HostSession: @unchecked Sendable {
 
     /// 編碼解析度：平常縮到手機像素（多出來的像素手機顯示不了，純浪費流量）；
     /// 手機放大時改原生解析度，放大後的小字才是真的像素而不是放大的模糊圖。
-    private static func geometry(display: CGDirectDisplayID, native: Bool, hello: HelloMessage) -> (width: Int, height: Int) {
-        let bounds = CGDisplayBounds(display)
-        let mode = CGDisplayCopyDisplayMode(display)
-        let nativeW = Double(mode?.pixelWidth ?? Int(bounds.width))
-        let nativeH = Double(mode?.pixelHeight ?? Int(bounds.height))
+    private func geometry(native: Bool, hello: HelloMessage) -> (width: Int, height: Int) {
+        let nativeW: Double
+        let nativeH: Double
+        if let window {
+            nativeW = Double(window.frame.width * window.scale)
+            nativeH = Double(window.frame.height * window.scale)
+        } else {
+            let bounds = CGDisplayBounds(displayID)
+            let mode = CGDisplayCopyDisplayMode(displayID)
+            nativeW = Double(mode?.pixelWidth ?? Int(bounds.width))
+            nativeH = Double(mode?.pixelHeight ?? Int(bounds.height))
+        }
         let scale = native ? 1 : min(1, Double(hello.viewWidth) / nativeW, Double(hello.viewHeight) / nativeH)
         return (Int(nativeW * scale) & ~1, Int(nativeH * scale) & ~1)
     }
@@ -794,7 +1070,7 @@ final class HostSession: @unchecked Sendable {
     /// 影像永遠是整個桌面，手機端只是縮放顯示，所以不會出現黑邊。
     private func applyDetail(_ native: Bool) async {
         guard let hello, !switching else { return }
-        let geo = Self.geometry(display: displayID, native: native, hello: hello)
+        let geo = geometry(native: native, hello: hello)
         do {
             lastFrame.withLock { $0 = nil }
             _ = try installEncoder(width: geo.width, height: geo.height)
@@ -820,6 +1096,21 @@ final class HostSession: @unchecked Sendable {
                 continue
             }
             useDisplay(display)
+            // 視窗模式：視窗還在就拍它所在的螢幕、裁出視窗；關掉了或拍不到就改回整個螢幕
+            if let w = window {
+                if let info = Self.windowInfo(w.id), let windowDisplay = Self.display(at: info.frame) {
+                    useDisplay(windowDisplay)
+                    useWindow(WindowTarget(id: w.id, frame: info.frame, scale: Self.scale(of: windowDisplay)))
+                    do {
+                        try await startCapture(hello, display: windowDisplay)
+                        return
+                    } catch {
+                        HostController.log.notice("擷取視窗失敗：\(error.localizedDescription, privacy: .public)")
+                    }
+                }
+                HostController.log.notice("視窗 \(w.id, privacy: .public) 已不在，改回整個螢幕")
+                useWindow(nil)
+            }
             do {
                 try await startCapture(hello, display: display)
                 return
@@ -833,8 +1124,8 @@ final class HostSession: @unchecked Sendable {
     }
 
     private func startCapture(_ hello: HelloMessage, display: CGDirectDisplayID) async throws {
-        let bounds = CGDisplayBounds(display)
-        let geo = Self.geometry(display: display, native: nativeDetail, hello: hello)
+        let bounds = window?.frame ?? CGDisplayBounds(display)
+        let geo = geometry(native: nativeDetail, hello: hello)
         let (w, h) = (geo.width, geo.height)
 
         do {
@@ -855,7 +1146,8 @@ final class HostSession: @unchecked Sendable {
                 self.queue.async { self.recoverCapture(error.localizedDescription) }
             }
             capturer.onAudio = { [weak self] sample in self?.encodeAudio(sample) }
-            try await capturer.start(displayID: display, width: w, height: h, fps: saverOn ? 30 : 60, audio: audioWanted)
+            let crop = window.map { Self.localRect($0.frame, on: display) }
+            try await capturer.start(displayID: display, crop: crop, width: w, height: h, fps: saverOn ? 30 : 60, audio: audioWanted)
 
             let ack = HelloAckMessage(desktopWidth: UInt16(bounds.width), desktopHeight: UInt16(bounds.height),
                                       videoWidth: UInt16(w), videoHeight: UInt16(h))
@@ -939,7 +1231,7 @@ final class HostSession: @unchecked Sendable {
         t.setEventHandler { [weak self] in
             guard let self else { return }
             guard ProcessInfo.processInfo.systemUptime - self.lastRemoteMouse > 0.5,
-                  let pos = InputInjector.currentCursorNormalized(display: self.displayID) else { return }
+                  let pos = InputInjector.currentCursorNormalized(in: self.injector.targetBounds) else { return }
             if let last = self.lastCursor, last == pos { return }
             self.lastCursor = pos
             self.framed.send(.cursor, CursorMessage(x: pos.0, y: pos.1).encode())
@@ -950,11 +1242,14 @@ final class HostSession: @unchecked Sendable {
 
     private func teardown() {
         ended.withLock { $0 = true }
+        Self.restoreMode(originalMode)
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
         screenObserver = nil
         lockObservers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
         lockObservers = []
         releaseDisplayAssertion()
+        windowTimer?.cancel()
+        windowTimer = nil
         cursorTimer?.cancel()
         cursorTimer = nil
         refineTimer?.cancel()

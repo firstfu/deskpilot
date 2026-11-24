@@ -46,6 +46,14 @@ enum MessageType: UInt8 {
     case setSaver = 0x0B
     /// 聲音串流開關：payload 為 UInt8，1 = 開、0 = 關。預設關。
     case setAudio = 0x0C
+    /// 要 Mac 上的視窗清單（payload 空）；主機回 `windowList`。
+    case listWindows = 0x0D
+    /// 改成只串流一個視窗：payload 為 UInt32 視窗 ID；0 = 回到整個螢幕。
+    /// 主機會把那個 App 帶到前景，之後的 `helloAck` 桌面大小＝視窗大小，座標以視窗為準。
+    case selectWindow = 0x0E
+    /// 解析度配合手機：payload 為 UInt8，1 = 連線期間把串流中的螢幕切到較低解析度（介面放大，優先 HiDPI），0 = 還原。
+    /// 主機切完會重送 helloAck；斷線或主機結束時自動還原。
+    case setFitResolution = 0x0F
     /// 加密框（雙向）：payload 為 ChaChaPoly(內層 type + 內層 payload)，見 `SecureChannel.swift`。
     case encrypted = 0x7F
 
@@ -74,6 +82,45 @@ enum MessageType: UInt8 {
     /// 主機狀態（加密）：payload 為 UInt8 位元旗標，見 `HostStateFlags`。開始串流時送一次，之後狀態變了再送。
     /// 後來加的：舊版手機不認得會略過，所以不必升協定版本。
     case hostState = 0x8E
+    /// 視窗清單（回應 `listWindows`）：`WindowListMessage`。
+    case windowList = 0x8F
+}
+
+/// Mac 上可以單獨串流的視窗（前景的排前面）。`current` 是目前正在串流的視窗 ID，0＝整個螢幕。
+struct WindowListMessage {
+    struct Item: Identifiable, Hashable {
+        var id: UInt32
+        var app: String
+        var title: String
+    }
+    var current: UInt32
+    var items: [Item]
+
+    func encode() -> Data {
+        var w = ByteWriter()
+        w.u32(current)
+        w.u16(UInt16(min(items.count, Int(UInt16.max))))
+        for i in items.prefix(Int(UInt16.max)) {
+            w.u32(i.id)
+            w.blob(Data(i.app.utf8.prefix(200)))
+            w.blob(Data(i.title.utf8.prefix(400)))
+        }
+        return w.data
+    }
+
+    static func decode(_ d: Data) throws -> WindowListMessage {
+        var r = ByteReader(d)
+        let current = try r.u32()
+        let n = Int(try r.u16())
+        var items: [Item] = []
+        for _ in 0..<n {
+            let id = try r.u32()
+            let app = String(decoding: try r.blob(), as: UTF8.self)
+            let title = String(decoding: try r.blob(), as: UTF8.self)
+            items.append(Item(id: id, app: app, title: title))
+        }
+        return WindowListMessage(current: current, items: items)
+    }
 }
 
 /// `hostState` 的位元旗標。
