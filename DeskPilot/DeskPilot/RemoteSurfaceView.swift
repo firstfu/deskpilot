@@ -4,8 +4,8 @@
 //
 //  遠端桌面操作面：顯示影像、本地繪製游標、把手勢轉成滑鼠／鍵盤事件。
 //  兩種觸控方式（`ClientSession.TouchMode`）：
-//  直接觸控（預設）：點哪裡就點 Mac 的哪裡；單指拖：放大時平移畫面、沒放大時游標跟著手指；
-//  雙指點＝在兩指中點右鍵；雙指滑＝捲動；長按後拖＝在手指下按住左鍵拖曳（手指下出現藍圈）。
+//  直接觸控（預設）：點哪裡就點 Mac 的哪裡；單指拖：放大時平移畫面、沒放大時游標跟著手指（浮在指尖上方，不被蓋住）；
+//  雙指點＝在兩指中點右鍵；雙指滑＝捲動；長按後拖＝在指尖上方按住左鍵拖曳（該處出現藍圈）。
 //  三指、四指、捏合與下方觸控板模式相同。
 //  觸控板模式：
 //  - 單指滑動：移動游標（有加速度，慢移精準、快移遠）
@@ -232,7 +232,16 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
         return CGPoint(x: min(max((p.x - r.minX) / r.width, 0), 1), y: min(max((p.y - r.minY) / r.height, 0), 1))
     }
 
-    /// 直接觸控：游標跳到手指底下。
+    /// 拖動時游標浮在指尖上方的距離（point，約 0.8 公分），不被手指蓋住。
+    private let fingerLift: CGFloat = 50
+
+    /// 拖動用的位置：指尖往上抬 `fingerLift`。靠近螢幕底部時抬高量線性縮到 0，手指滑到最底仍能碰到 Dock。
+    private func lifted(_ p: CGPoint) -> CGPoint {
+        let lift = fingerLift * min(max((bounds.maxY - p.y) / fingerLift, 0), 1)
+        return CGPoint(x: p.x, y: p.y - lift)
+    }
+
+    /// 直接觸控：游標跳到該點（點一下用手指正下方；拖動用 `lifted` 後的位置）。
     private func moveCursor(toView p: CGPoint) {
         session.moveCursor(to: desktopPoint(p))
         notifyEdgeIfNeeded()
@@ -253,7 +262,7 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
                 pan.y += t.y
                 applyLayout()
             } else {
-                moveCursor(toView: g.location(in: self))
+                moveCursor(toView: lifted(g.location(in: self)))
             }
             return
         }
@@ -388,15 +397,17 @@ final class RemoteSurfaceView: UIView, UIGestureRecognizerDelegate {
     @objc private func onDrag(_ g: UILongPressGestureRecognizer) {
         let loc = g.location(in: self)
         if isDirect {
+            // 按住的位置與藍圈都在指尖上方，看得到抓住的是什麼
+            let p = lifted(loc)
             switch g.state {
             case .began:
-                moveCursor(toView: loc)
+                moveCursor(toView: p)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                showDragIndicator(at: loc)
+                showDragIndicator(at: p)
                 session.send(.mouseButton(.left, down: true))
             case .changed:
-                moveCursor(toView: loc)
-                showDragIndicator(at: loc)
+                moveCursor(toView: p)
+                showDragIndicator(at: p)
                 followCursor()
                 applyLayout()
             default:
