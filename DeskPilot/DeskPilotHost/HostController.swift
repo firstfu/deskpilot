@@ -313,6 +313,9 @@ final class HostSession: @unchecked Sendable {
     /// 串流期間不讓螢幕閒置睡著的電源宣告。
     private let displayAssertion = OSAllocatedUnfairLock<IOPMAssertionID?>(initialState: nil)
     private var screenObserver: NSObjectProtocol?
+    private var lockObservers: [NSObjectProtocol] = []
+    /// 上次告訴手機的主機狀態旗標（只在 `queue` 上存取）；nil＝還沒送過。
+    private var sentHostState: UInt8?
     /// 手機放大時要原生解析度（小字才清楚）；平常縮到手機像素。
     private var nativeDetail = false
     /// 換畫質進行中時，後到的請求先記著，做完再套最新那個（只在 `queue` 上存取）。
@@ -387,6 +390,15 @@ final class HostSession: @unchecked Sendable {
                     self.recoverCapture("螢幕 \(self.displayID) 不見了")
                 }
             }
+        }
+        // Mac 鎖定／解鎖：告訴手機，鎖定畫面打不了字（安全輸入），手機才不會以為是鍵盤壞了
+        let center = DistributedNotificationCenter.default()
+        for name in ["com.apple.screenIsLocked", "com.apple.screenIsUnlocked"] {
+            lockObservers.append(center.addObserver(forName: Notification.Name(name), object: nil, queue: nil) { [weak self] _ in
+                guard let self else { return }
+                // 通知比 CGSession 的狀態稍早到，等一下再讀
+                self.queue.asyncAfter(deadline: .now() + 0.3) { self.sendHostState() }
+            })
         }
         // 交握逾時：10 秒內沒完成交握就斷線，避免閒置連線佔位
         queue.asyncAfter(deadline: .now() + 10) { [weak self] in
@@ -687,6 +699,23 @@ final class HostSession: @unchecked Sendable {
         }
     }
 
+    /// Mac 是否停在鎖定畫面。解鎖時 `CGSSessionScreenIsLocked` 這個鍵不存在。
+    private static func screenIsLocked() -> Bool {
+        let info = CGSessionCopyCurrentDictionary() as? [String: Any]
+        return (info?["CGSSessionScreenIsLocked"] as? Bool) ?? false
+    }
+
+    /// 串流中才送，狀態沒變不重送（只在 `queue` 上呼叫）。
+    private func sendHostState() {
+        guard hello != nil, authorized, !ended.withLock({ $0 }) else { return }
+        let locked = Self.screenIsLocked()
+        let flags: UInt8 = locked ? HostStateFlags.screenLocked : 0
+        guard flags != sentHostState else { return }
+        sentHostState = flags
+        HostController.log.notice("Mac \(locked ? "已鎖定" : "未鎖定", privacy: .public)，通知手機")
+        framed.send(.hostState, Data([flags]))
+    }
+
     /// 告訴手機為什麼斷線，等 1 秒再斷（立刻斷的話回覆可能送不到，見 external-access.md）。
     private func fail(_ message: String) {
         onError?(message)
@@ -832,6 +861,7 @@ final class HostSession: @unchecked Sendable {
                                       videoWidth: UInt16(w), videoHeight: UInt16(h))
             framed.send(.helloAck, ack.encode())
             sendDisplayInfo()
+            queue.async { self.sentHostState = nil; self.sendHostState() }
             onStarted?((w, h), enc.codec)
             queue.async {
                 // 切換螢幕時計時器已在跑，不重複建立
@@ -922,6 +952,8 @@ final class HostSession: @unchecked Sendable {
         ended.withLock { $0 = true }
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
         screenObserver = nil
+        lockObservers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
+        lockObservers = []
         releaseDisplayAssertion()
         cursorTimer?.cancel()
         cursorTimer = nil

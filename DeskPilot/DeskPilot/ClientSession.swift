@@ -79,6 +79,8 @@ final class ClientSession {
     private(set) var armedModifiers: KeyModifiers = []
     /// 短暫提示（例如「已拷貝到手機剪貼簿」），數秒後自動消失。
     private(set) var toast: String?
+    /// Mac 停在鎖定畫面（主機回報）：這時打不了字，畫面上常駐提示。
+    private(set) var macLocked = false
     private(set) var saverPreference = SaverPreference(rawValue: UserDefaults.standard.string(forKey: "saverPreference") ?? "") ?? .auto
     /// 目前網路是不是計量網路（行動網路、個人熱點）。
     private(set) var networkIsExpensive = false
@@ -182,6 +184,14 @@ final class ClientSession {
                 }
             }
         }
+        l.onHostState = { [weak self] flags in
+            Task { @MainActor in
+                guard let self else { return }
+                let locked = flags & HostStateFlags.screenLocked != 0
+                if self.macLocked, !locked { self.showToast("Mac 已解鎖") }
+                self.macLocked = locked
+            }
+        }
         l.onDisplayInfo = { [weak self] info in
             Task { @MainActor in
                 self?.displayCount = Int(info.count)
@@ -204,6 +214,8 @@ final class ClientSession {
             Task { @MainActor in
                 guard let self, self.link === l else { return }
                 self.link = nil
+                // 重連後主機會重送鎖定狀態
+                self.macLocked = false
                 self.statsTimer?.invalidate()
                 self.statsTimer = nil
                 // 沒被明確拒絕的中斷（切換網路、手機睡眠、Wi-Fi 閃斷）自動重連，不必回清單重點
@@ -465,6 +477,7 @@ final class ClientLink: @unchecked Sendable {
     var onCursor: ((CursorMessage) -> Void)?
     var onDisplayInfo: ((DisplayInfoMessage) -> Void)?
     var onHostClipboard: ((String) -> Void)?
+    var onHostState: ((UInt8) -> Void)?
     /// 聲音播放器；開啟聲音後收到格式才建立。只在 `queue` 上存取。
     private var audioPlayer: AudioPlayer?
     private var audioPlaybackWanted = false
@@ -663,6 +676,8 @@ final class ClientLink: @unchecked Sendable {
             if let d = try? DisplayInfoMessage.decode(payload) { onDisplayInfo?(d) }
         case .hostClipboard:
             onHostClipboard?(String(data: payload, encoding: .utf8) ?? "")
+        case .hostState:
+            if let flags = payload.first { onHostState?(flags) }
         case .hostError:
             // 主機說明為什麼要斷線（例如沒有可擷取的螢幕）；記成拒絕原因，斷線時顯示這段而不是「連線中斷」
             let reason = String(data: payload, encoding: .utf8) ?? ""

@@ -71,6 +71,15 @@ enum MessageType: UInt8 {
     /// 主機無法串流、即將斷線的原因（加密）：payload 為 UTF-8 給使用者看的文字。
     /// 後來加的：舊版手機不認得會略過（照樣只看到斷線），所以不必升協定版本。
     case hostError = 0x8D
+    /// 主機狀態（加密）：payload 為 UInt8 位元旗標，見 `HostStateFlags`。開始串流時送一次，之後狀態變了再送。
+    /// 後來加的：舊版手機不認得會略過，所以不必升協定版本。
+    case hostState = 0x8E
+}
+
+/// `hostState` 的位元旗標。
+enum HostStateFlags {
+    /// Mac 停在鎖定畫面：密碼欄位開著安全輸入，遠端送的鍵盤事件進不去（滑鼠可以）。
+    static let screenLocked: UInt8 = 1 << 0
 }
 
 /// `pairResult` 的 payload。2 是後來加的：舊版手機只認 1，其他值一律當拒絕，所以不必升協定版本。

@@ -170,6 +170,17 @@ struct RemoteScreen: View {
                     .foregroundStyle(.white)
             }
         }
+        .overlay(alignment: .top) {
+            if session.macLocked {
+                Label("Mac 已鎖定，遠端無法輸入密碼（滑鼠可用）", systemImage: "lock.fill")
+                    .font(.footnote)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(.black.opacity(0.75), in: Capsule())
+                    .foregroundStyle(.white)
+                    .padding(.top, 8)
+                    .allowsHitTesting(false)
+            }
+        }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
     }

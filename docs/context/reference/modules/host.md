@@ -43,6 +43,7 @@ macOS App，非沙箱（`ENABLE_APP_SANDBOX = NO`，CGEvent 注入需要）。�
   - 開始串流時（`beginStreaming`）先叫醒螢幕（`IOPMAssertionDeclareUserActivity`），串流期間持有 `PreventUserIdleDisplaySleep`，斷線時放掉；記住的螢幕不在作用中清單就改用目前的主螢幕；失敗每秒重試，最多 5 次。
   - 擷取中途停掉（`SCStream` 的 `didStopWithError`）或螢幕配置變了（`NSApplication.didChangeScreenParametersNotification`）且操控中的螢幕不見：停掉舊擷取，換到還在的螢幕重開，流程同切換螢幕（重送 `helloAck`，不斷線）。配置變了但螢幕還在，只重送 `displayInfo`。一分鐘內中斷超過 3 次就放棄。
   - 都救不回來時送 `hostError`（UTF-8 原因）再等 1 秒斷線，手機顯示原因而不是「連線中斷」。完全沒有作用中的螢幕（筆電闔上又沒接外接螢幕）時沒有東西可以擷取，只能顯示原因。
+  - 已在實機驗證（2026-11-24）：兩次外網連線都是先「沒有作用中的螢幕」，叫醒後擷取中斷，再自動換到另一台螢幕接回。
 
 ## 位元率與 codec 的決策依據
 
@@ -64,6 +65,12 @@ macOS App，非沙箱（`ENABLE_APP_SANDBOX = NO`，CGEvent 注入需要）。�
 
 ### 手機通過驗證卻「連線中斷」：主機 log 有 `找不到螢幕`
 2026-11-23 外網連不上的真正原因：Tunnel、權限、防火牆都正常，手機也通過驗證，但主機 02:32 啟動時記下的螢幕之後不在了（推測是闔上筆電，作用中只剩兩台外接螢幕），每次開始擷取都回 `找不到螢幕`。查法：`/usr/bin/log show … --predicate 'subsystem == "tw.firstfu.DeskPilotHost"'` 看 `交握：驗證` 之後接什麼。已改成自動換到還在的螢幕（見上方「多螢幕切換」）；注意主機 log 的 subsystem 是 `tw.firstfu.DeskPilotHost`，`tw.firstfu.DeskPilot` 只有連線層的訊息。
+
+### Mac 停在鎖定畫面時，手機打不了字（滑鼠可以）
+鎖定畫面的密碼欄位由 `loginwindow` 開啟**安全輸入**（Secure Event Input），只收實體鍵盤，`CGEvent` 注入的鍵盤事件一律進不去；這是 macOS 的保護，`ax=true` 也一樣，只有 Apple 自己有特權的工具（如內建螢幕共享）能打。終端機的「安全鍵盤輸入」、密碼管理程式開著時也會這樣。2026-11-24 的「從手機無法打字」就是這個：Mac 從早上鎖到傍晚，手機連進來時主機叫醒螢幕，看到的是密碼畫面。
+- 查法：`/usr/bin/log show … --predicate 'process == "loginwindow" AND eventMessage CONTAINS "LWScreenLock"'`，`enqueueLockScreenRequest`＝鎖、`handleUnlockResult`＝解鎖嘗試結束；目前狀態看 `CGSessionCopyCurrentDictionary()` 的 `CGSSessionScreenIsLocked`（解鎖時這個鍵不存在）。看誰開著安全輸入：`ioreg -l -w 0 | grep kCGSSessionSecureInputPID`。
+- 主機會在鎖定／解鎖時送 `hostState`，手機常駐提示「Mac 已鎖定」（2026-11-24 起），所以使用者看得出不是鍵盤壞了；但**解不開**。
+- 避免被鎖：關掉「系統設定 › 鎖定畫面 › 螢幕保護程式啟動或螢幕關閉後需要密碼」（改「永不」）。**iPhone 鏡像輸出設成「自動認證」時這項被強制鎖成「立即」**（畫面上是灰的），`sysadminctl -screenLock off -password -` 回 `MKBDeviceSetGracePeriod error -14`；要先到 iPhone 鏡像輸出的設定改成「每次都詢問」。改完用 `sysadminctl -screenLock status` 確認（`screenLock is off`）。重開機、系統更新、手動鎖定仍會鎖，從手機解不開。
 
 ### 缺螢幕錄製權限時，表現是「連上就斷」
 ScreenCaptureKit 會回 `使用者拒絕應用程式、視窗、顯示器擷取的TCC`，主機隨即關掉連線，手機只看到「連線中斷」。**實際上**權限綁在 App 的程式碼簽章上，使用者以為開了、實際上開的可能是別的版本。主機啟動時會跑 `CGPreflightScreenCaptureAccess()` 並寫進 log（`螢幕錄製權限預檢：true/false`），以這個為準；false 時再呼叫 `CGRequestScreenCaptureAccess()` 讓系統把 App 加進設定清單。

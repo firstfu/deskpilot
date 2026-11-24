@@ -53,6 +53,11 @@ iOS App。`ClientSession`（主執行緒狀態）＋ `ClientLink`（自己的序
 
 每次連線（區網或外網）前先跑 `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`：Face ID，失敗可改輸入手機密碼；沒通過就不連。用意是手機遺失時，撿到的人拿不到 Mac 控制權。`Info.plist` 需要 `NSFaceIDUsageDescription`。外網用的「用 IP 連線」入口記住上次位址（`@AppStorage("manualHostAddress")`），沒有 Bonjour 主機 ID 時有任何配對紀錄就走驗證模式。
 
+## 主機狀態提示
+
+- 收到 `hostState` 的鎖定旗標時，畫面上方常駐「Mac 已鎖定，遠端無法輸入密碼（滑鼠可用）」（`ClientSession.macLocked`），解鎖後收掉並短暫提示「Mac 已解鎖」；斷線時清掉，重連後主機會重送。原因見 `host.md`「Mac 停在鎖定畫面時，手機打不了字」。
+- 收到 `hostError` 時把內容記成拒絕原因，斷線後顯示這段（不自動重連），而不是籠統的「連線中斷」。
+
 ## ⚠️ 中文輸入要等組字結束
 
 鍵盤用一個隱形 `UITextField`。**關鍵**：`markedTextRange != nil`（注音／倉頡還在選字）時不送；選字確認後才把整串文字送出並清空欄位。若逐字送，電腦端會收到注音符號或半成品。退格靠覆寫 `deleteBackward`（欄位是空的也會被呼叫）。黏滯的 ⌘ 鍵：按一下後，下一個英數字以 ⌘＋鍵碼送出（用 ANSI 鍵碼表），其餘文字照常走 Unicode。
